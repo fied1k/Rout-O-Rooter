@@ -31,9 +31,9 @@
    * **`ingest_file(path)`**: Single entry point handling `.csv` (header-aware & raw fallback), `.json` (tuples or key-value dicts), plain `.txt`, and images (`.png`, `.jpg`, `.jpeg`, `.tiff`, `.bmp`, `.webp`).
    * **`ingest_image(path)`**: Pytesseract OCR pipeline reading text from visual files.
    * **`parse_coordinates(text)`**: High-tolerance regex extractor extracting `(lat, lon)` pairs.
-   * **`optimize_route(coords)`**: Zero-cost TSP solver communicating with Open Source Routing Machine (`http://router.project-osrm.org/trip/v1/driving/`).
+   * **`optimize_route(coords, start_coord=None, end_coord=None, roundtrip=False)`**: Zero-cost TSP solver communicating with Open Source Routing Machine (`http://router.project-osrm.org/trip/v1/driving/`), supporting optional fixed origin, fixed destination, and roundtrips.
    * **`generate_google_maps_url(coords)`**: Constructs standard multi-stop navigation URLs with origin, destination, and intermediate waypoints.
-   * **`generate_apple_maps_url(coords)`**: Constructs native Apple Maps multi-stop navigation URLs (`saddr`, `daddr`, and `+to:` waypoints).
+   * **`generate_apple_maps_url(coords)`**: Constructs native Apple Maps multi-stop navigation URLs using the unified `/directions` multi-waypoint scheme.
    * **`generate_qr(url, output_path)`**: Builds local PNG QR code files for handoff to mobile devices.
    * **`TestRouteOptimizer`**: Self-testing harness covering regex extraction, CSV ingestion, JSON parsing, and routing URL generation.
 

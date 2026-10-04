@@ -403,6 +403,100 @@
       color: var(--danger);
     }
 
+    /* Route Endpoints Styling */
+    .endpoint-section {
+      background-color: var(--bg-dark);
+      border: 1px solid var(--border-dark);
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .endpoint-header {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .endpoint-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .endpoint-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .endpoint-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .endpoint-input {
+      flex: 1;
+      background-color: var(--card-dark);
+      border: 1px solid var(--border-dark);
+      border-radius: 6px;
+      color: var(--text-main);
+      padding: 7px 10px;
+      font-size: 0.78rem;
+      font-family: monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .btn-geo {
+      background-color: var(--surface-dark);
+      border: 1px solid var(--border-dark);
+      color: var(--primary);
+      font-size: 0.73rem;
+      font-weight: 500;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-geo:hover {
+      background-color: rgba(56, 189, 248, 0.15);
+      border-color: var(--primary);
+    }
+
+    .btn-geo.active {
+      background-color: rgba(16, 185, 129, 0.2);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .btn-icon-clear {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.9rem;
+      padding: 4px 6px;
+      border-radius: 4px;
+      transition: color 0.15s;
+    }
+
+    .btn-icon-clear:hover {
+      color: var(--danger);
+    }
+
     /* Map & Output Panel */
     .map-container-wrapper {
       height: 480px;
@@ -627,8 +721,42 @@ Drop 4: 38.9282, -94.7214"></textarea>
         </div>
       </div>
 
+      <!-- Route Endpoints (Optional Start & End Points) -->
+      <div class="endpoint-section">
+        <div class="endpoint-header">
+          <span>🚩 Start & End Points <span style="font-weight: normal; color: var(--text-muted); font-size: 0.72rem;">(Optional)</span></span>
+        </div>
+
+        <!-- Starting Point -->
+        <div class="endpoint-group">
+          <label class="endpoint-label">Starting Point</label>
+          <div class="endpoint-row">
+            <input type="text" id="start-point-input" class="endpoint-input" placeholder="Default: First Staged Stop" onchange="onManualEndpointChange('start')" />
+            <button type="button" class="btn-geo" id="btn-geo-start" onclick="useCurrentLocation('start')" title="Use My Current GPS Location">
+              📍 My Location
+            </button>
+            <button type="button" class="btn-icon-clear" onclick="clearEndpoint('start')" title="Clear Start Point">✕</button>
+          </div>
+        </div>
+
+        <!-- Ending Point -->
+        <div class="endpoint-group">
+          <label class="endpoint-label">Ending Point</label>
+          <div class="endpoint-row">
+            <input type="text" id="end-point-input" class="endpoint-input" placeholder="Default: Optimal Final Stop" onchange="onManualEndpointChange('end')" />
+            <button type="button" class="btn-geo" id="btn-geo-end" onclick="useCurrentLocation('end')" title="Use My Current GPS Location">
+              📍 My Location
+            </button>
+            <button type="button" class="btn-geo" id="btn-roundtrip" onclick="toggleRoundtrip()" title="Return to Starting Point (Roundtrip)">
+              🔄 Roundtrip
+            </button>
+            <button type="button" class="btn-icon-clear" onclick="clearEndpoint('end')" title="Clear End Point">✕</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Optimize Action -->
-      <button class="btn-action btn-accent" id="btn-optimize" onclick="optimizeCurrentRoute()" style="margin-top: auto; padding: 14px;">
+      <button class="btn-action btn-accent" id="btn-optimize" onclick="optimizeCurrentRoute()" style="margin-top: 6px; padding: 14px;">
         🚀 Optimize Route (OSRM TSP Solver)
       </button>
     </div>
@@ -716,6 +844,9 @@ Drop 4: 38.9282, -94.7214"></textarea>
     let googleMapsUrl = "";
     let appleMapsUrl = "";
     let activeProvider = "google";
+    let startCoord = null;
+    let endCoord = null;
+    let isRoundtrip = false;
 
     // Presets
     const PRESETS = {
@@ -1034,14 +1165,125 @@ Drop 4: 38.9282, -94.7214"></textarea>
       showToast("Cleared all stops");
     }
 
+    function useCurrentLocation(type) {
+      if (!navigator.geolocation) {
+        showToast("Geolocation is not supported by your browser");
+        return;
+      }
+      showToast("Acquiring current GPS location...");
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = parseFloat(position.coords.latitude.toFixed(6));
+          const lon = parseFloat(position.coords.longitude.toFixed(6));
+          if (type === 'start') {
+            startCoord = [lat, lon];
+            document.getElementById('start-point-input').value = `📍 My Location (${lat}, ${lon})`;
+            document.getElementById('btn-geo-start').classList.add('active');
+            showToast("Starting point set to current location");
+          } else {
+            endCoord = [lat, lon];
+            isRoundtrip = false;
+            document.getElementById('end-point-input').value = `📍 My Location (${lat}, ${lon})`;
+            document.getElementById('btn-geo-end').classList.add('active');
+            document.getElementById('btn-roundtrip').classList.remove('active');
+            showToast("Ending point set to current location");
+          }
+          updateMapMarkers();
+        },
+        (error) => {
+          showToast("Geolocation error: " + error.message);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+      );
+    }
+
+    function toggleRoundtrip() {
+      isRoundtrip = !isRoundtrip;
+      const endInput = document.getElementById('end-point-input');
+      const roundtripBtn = document.getElementById('btn-roundtrip');
+      const geoEndBtn = document.getElementById('btn-geo-end');
+
+      if (isRoundtrip) {
+        endCoord = null;
+        endInput.value = "🔄 Return to Start Point";
+        roundtripBtn.classList.add('active');
+        geoEndBtn.classList.remove('active');
+        showToast("Roundtrip enabled (ends at starting point)");
+      } else {
+        endInput.value = "";
+        roundtripBtn.classList.remove('active');
+        showToast("Roundtrip disabled");
+      }
+      updateMapMarkers();
+    }
+
+    function clearEndpoint(type) {
+      if (type === 'start') {
+        startCoord = null;
+        document.getElementById('start-point-input').value = "";
+        document.getElementById('btn-geo-start').classList.remove('active');
+        showToast("Cleared starting point (defaults to first staged stop)");
+      } else {
+        endCoord = null;
+        isRoundtrip = false;
+        document.getElementById('end-point-input').value = "";
+        document.getElementById('btn-geo-end').classList.remove('active');
+        document.getElementById('btn-roundtrip').classList.remove('active');
+        showToast("Cleared ending point (defaults to optimal final stop)");
+      }
+      updateMapMarkers();
+    }
+
+    function onManualEndpointChange(type) {
+      const input = document.getElementById(type === 'start' ? 'start-point-input' : 'end-point-input');
+      const val = input.value.trim();
+      if (!val) {
+        clearEndpoint(type);
+        return;
+      }
+      const match = val.match(/(-?\d{1,2}\.\d+)[,\s]+(-?\d{1,3}\.\d+)/);
+      if (match) {
+        const parsed = [parseFloat(match[1]), parseFloat(match[2])];
+        if (type === 'start') {
+          startCoord = parsed;
+          document.getElementById('btn-geo-start').classList.remove('active');
+        } else {
+          endCoord = parsed;
+          isRoundtrip = false;
+          document.getElementById('btn-geo-end').classList.remove('active');
+          document.getElementById('btn-roundtrip').classList.remove('active');
+        }
+        updateMapMarkers();
+        showToast(`Parsed ${type} point coordinates`);
+      }
+    }
+
     function updateMapMarkers() {
       markersLayer.clearLayers();
       routeLayer.clearLayers();
 
-      if (!currentCoords.length) return;
-
       const bounds = [];
+
+      // Render Start Point Pin if defined
+      if (startCoord) {
+        bounds.push(startCoord);
+        const startIcon = L.divIcon({
+          className: 'custom-map-pin',
+          html: `<div style="background:#10b981;color:#ffffff;border:2px solid #fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;box-shadow:0 3px 8px rgba(0,0,0,0.6);">🚩</div>`,
+          iconSize: [26, 26],
+          iconAnchor: [13, 13]
+        });
+        L.marker(startCoord, { icon: startIcon })
+          .bindPopup(`<b>Starting Point</b><br>${startCoord[0].toFixed(5)}, ${startCoord[1].toFixed(5)}`)
+          .addTo(markersLayer);
+      }
+
+      // Render Staged Stops Pins
       currentCoords.forEach((coord, i) => {
+        // Skip rendering duplicate pin if already rendered as startCoord or endCoord
+        if (startCoord && Math.abs(coord[0] - startCoord[0]) < 0.0001 && Math.abs(coord[1] - startCoord[1]) < 0.0001) return;
+        if (endCoord && Math.abs(coord[0] - endCoord[0]) < 0.0001 && Math.abs(coord[1] - endCoord[1]) < 0.0001) return;
+
         bounds.push(coord);
         const icon = L.divIcon({
           className: 'custom-map-pin',
@@ -1054,6 +1296,20 @@ Drop 4: 38.9282, -94.7214"></textarea>
           .addTo(markersLayer);
       });
 
+      // Render End Point Pin if defined and not roundtrip
+      if (endCoord && !isRoundtrip) {
+        bounds.push(endCoord);
+        const endIcon = L.divIcon({
+          className: 'custom-map-pin',
+          html: `<div style="background:#ef4444;color:#ffffff;border:2px solid #fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;box-shadow:0 3px 8px rgba(0,0,0,0.6);">🏁</div>`,
+          iconSize: [26, 26],
+          iconAnchor: [13, 13]
+        });
+        L.marker(endCoord, { icon: endIcon })
+          .bindPopup(`<b>Ending Point</b><br>${endCoord[0].toFixed(5)}, ${endCoord[1].toFixed(5)}`)
+          .addTo(markersLayer);
+      }
+
       if (bounds.length) {
         map.fitBounds(bounds, { padding: [40, 40] });
       }
@@ -1061,8 +1317,22 @@ Drop 4: 38.9282, -94.7214"></textarea>
 
     // TSP Route Optimization via OSRM Trip API
     async function optimizeCurrentRoute() {
-      if (currentCoords.length < 2) {
-        showToast("Please stage at least 2 waypoints to optimize");
+      // Assemble full waypoint payload: start point + intermediate stops + end point
+      const points = [];
+      if (startCoord) {
+        points.push(startCoord);
+      }
+      currentCoords.forEach(c => {
+        if (startCoord && Math.abs(c[0] - startCoord[0]) < 0.0001 && Math.abs(c[1] - startCoord[1]) < 0.0001) return;
+        if (endCoord && Math.abs(c[0] - endCoord[0]) < 0.0001 && Math.abs(c[1] - endCoord[1]) < 0.0001) return;
+        points.push(c);
+      });
+      if (endCoord && !isRoundtrip) {
+        points.push(endCoord);
+      }
+
+      if (points.length < 2) {
+        showToast("Please provide at least 2 total stops or endpoints to optimize");
         return;
       }
 
@@ -1073,9 +1343,10 @@ Drop 4: 38.9282, -94.7214"></textarea>
       status.textContent = "Querying OSRM Trip API...";
 
       try {
-        // Format for OSRM: {longitude},{latitude}
-        const coordString = currentCoords.map(c => `${c[1]},${c[0]}`).join(';');
-        const url = `https://router.project-osrm.org/trip/v1/driving/${coordString}?roundtrip=false&source=first&overview=full&geometries=geojson`;
+        const destParam = (endCoord || isRoundtrip) ? "last" : "any";
+        const roundtripParam = isRoundtrip ? "true" : "false";
+        const coordString = points.map(c => `${c[1]},${c[0]}`).join(';');
+        const url = `https://router.project-osrm.org/trip/v1/driving/${coordString}?roundtrip=${roundtripParam}&source=first&destination=${destParam}&overview=full&geometries=geojson`;
 
         const response = await fetch(url);
         if (!response.ok) throw new Error("OSRM routing server responded with error");
@@ -1088,7 +1359,6 @@ Drop 4: 38.9282, -94.7214"></textarea>
         const trip = data.trips[0];
         const waypoints = data.waypoints;
 
-        // Sort waypoints by waypoint_index to get optimized stop sequence
         waypoints.sort((a, b) => a.waypoint_index - b.waypoint_index);
         const optimizedCoords = waypoints.map(wp => [wp.location[1], wp.location[0]]);
 

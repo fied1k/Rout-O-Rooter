@@ -55,10 +55,19 @@ class RoutORooterHandler(SimpleHTTPRequestHandler):
             try:
                 data = json.loads(body)
                 coords = [tuple(c) for c in data.get("coords", [])]
-                if len(coords) < 2:
-                    raise ValueError("At least 2 coordinates are required.")
+                start_coord = tuple(data["start_coord"]) if data.get("start_coord") else None
+                end_coord = tuple(data["end_coord"]) if data.get("end_coord") else None
+                roundtrip = bool(data.get("roundtrip", False))
 
-                optimized = optimizer.optimize_route(coords)
+                if len(coords) < 1 and not (start_coord and end_coord):
+                    raise ValueError("At least 2 total coordinates are required.")
+
+                optimized = optimizer.optimize_route(
+                    coords,
+                    start_coord=start_coord,
+                    end_coord=end_coord,
+                    roundtrip=roundtrip
+                )
                 maps_url = optimizer.generate_google_maps_url(optimized)
                 apple_maps_url = optimizer.generate_apple_maps_url(optimized)
                 qr_path = optimizer.generate_qr(maps_url)

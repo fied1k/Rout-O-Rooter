@@ -93,11 +93,33 @@ class RouteOptimizer:
             with open(file_path, "r", encoding="utf-8") as f:
                 return self.parse_coordinates(f.read())
 
-    def optimize_route(self, coords: List[Tuple[float, float]]) -> List[Tuple[float, float]]:
-        """Uses OSRM Trip API to sequence coordinates (TSP solver)."""
-        # OSRM expects {longitude},{latitude}
-        coord_string = ";".join([f"{lon},{lat}" for lat, lon in coords])
-        url = f"http://router.project-osrm.org/trip/v1/driving/{coord_string}?roundtrip=false&source=first"
+    def optimize_route(
+        self,
+        coords: List[Tuple[float, float]],
+        start_coord: Tuple[float, float] = None,
+        end_coord: Tuple[float, float] = None,
+        roundtrip: bool = False
+    ) -> List[Tuple[float, float]]:
+        """Uses OSRM Trip API to sequence coordinates (TSP solver) with optional start/end endpoints."""
+        route_points = list(coords)
+        if start_coord and (not route_points or route_points[0] != start_coord):
+            route_points.insert(0, start_coord)
+
+        if end_coord and (not route_points or route_points[-1] != end_coord):
+            route_points.append(end_coord)
+
+        if len(route_points) < 2:
+            raise ValueError("Requires at least 2 coordinates.")
+
+        coord_string = ";".join([f"{lon},{lat}" for lat, lon in route_points])
+
+        dest_flag = "last" if (end_coord or roundtrip) else "any"
+        roundtrip_flag = "true" if roundtrip else "false"
+
+        url = (
+            f"http://router.project-osrm.org/trip/v1/driving/{coord_string}"
+            f"?roundtrip={roundtrip_flag}&source=first&destination={dest_flag}"
+        )
 
         response = requests.get(url, timeout=10)
         if response.status_code != 200:
@@ -199,6 +221,15 @@ class TestRouteOptimizer(unittest.TestCase):
         self.assertIn("maps.apple.com/directions", apple_url)
         self.assertIn("source=", apple_url)
         self.assertIn("destination=", apple_url)
+
+    def test_start_and_end_endpoints(self):
+        stops = [(39.0997, -94.5786), (39.1141, -94.6275)]
+        start = (38.9806, -94.6730)
+        end = (38.9282, -94.7214)
+        optimized = self.ro.optimize_route(stops, start_coord=start, end_coord=end)
+        self.assertEqual(len(optimized), 4)
+        self.assertAlmostEqual(optimized[0][0], start[0], places=2)
+        self.assertAlmostEqual(optimized[-1][0], end[0], places=2)
 
 
 if __name__ == "__main__":
