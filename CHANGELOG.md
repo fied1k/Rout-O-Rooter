@@ -9,6 +9,8 @@ All notable changes to this project are documented in this file.
 - Support for `.json` files structured as coordinate dictionaries or coordinate tuples/lists.
 - Plain `.txt` file parsing and automated routing to `pytesseract` for image files (`.png`, `.jpg`, `.jpeg`, `.tiff`, `.bmp`, `.webp`).
 - Integrated unit test suite expansions for `.csv` and `.json` file ingestion validation.
+- Interactive Web GUI (`index.html`) featuring Leaflet map routing visualization, live QR code display, and drag-and-drop file ingestion.
+- Local GUI web server (`web_server.py`) with REST API bridge to `RouteOptimizer` engine.
 
 ### Changed
 - Bumped project version to `v0.2.1`.

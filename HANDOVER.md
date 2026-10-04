@@ -56,9 +56,11 @@ rout-o-rooter/
 ├── CHANGELOG.md                   # Complete semantic change history
 ├── email_listener.py              # IMAP polling background script
 ├── HANDOVER.md                    # System architecture & maintenance guide
+├── index.html                     # Responsive Web GUI (Leaflet + QR + OSRM)
 ├── README.md                      # General documentation and setup
 ├── requirements.txt               # Pinned dependencies
-└── route_optimizer.py             # Active production codebase (v0.2.1)
+├── route_optimizer.py             # Active production codebase (v0.2.1)
+└── web_server.py                  # Local GUI web server & API bridge
 ```
 
 ---

@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rout-o-Rooter | Zero-Cost Route Optimizer</title>
+  
+  <!-- Leaflet CSS for Interactive Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <!-- QRCode.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --surface-dark: #1e293b;
+      --card-dark: #1b253b;
+      --border-dark: #334155;
+      --primary: #38bdf8;
+      --primary-hover: #0ea5e9;
+      --accent: #10b981;
+      --accent-hover: #059669;
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --warning: #f59e0b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --radius: 10px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+      border-bottom: 1px solid var(--border-dark);
+      padding: 14px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, #0284c7, #10b981);
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: bold;
+      box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-title span {
+      color: var(--primary);
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background-color: rgba(56, 189, 248, 0.15);
+      color: var(--primary);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    .badge-status {
+      background-color: rgba(148, 163, 184, 0.15);
+      color: var(--text-muted);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      font-size: 0.75rem;
+      padding: 4px 10px;
+    }
+
+    .badge-status.connected {
+      background-color: rgba(16, 185, 129, 0.15);
+      color: var(--accent);
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+
+    .header-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      margin-left: 16px;
+      transition: color 0.2s;
+    }
+
+    .header-links a:hover {
+      color: var(--primary);
+    }
+
+    .main-container {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 460px 1fr;
+      gap: 20px;
+      padding: 20px 28px;
+      max-width: 1700px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 1080px) {
+      .main-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background-color: var(--surface-dark);
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-dark);
+      padding-bottom: 12px;
+    }
+
+    .panel-title {
+      font-size: 1rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 6px;
+      background-color: var(--bg-dark);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border-dark);
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 8px 12px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background-color: var(--card-dark);
+      color: var(--primary);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    .tab-content {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .tab-content.active {
+      display: flex;
+    }
+
+    textarea {
+      width: 100%;
+      height: 120px;
+      background-color: var(--bg-dark);
+      border: 1px solid var(--border-dark);
+      border-radius: 8px;
+      color: var(--text-main);
+      padding: 10px 14px;
+      font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Consolas, monospace;
+      font-size: 0.85rem;
+      resize: vertical;
+      line-height: 1.4;
+    }
+
+    textarea:focus, input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+
+    .dropzone {
+      border: 2px dashed var(--border-dark);
+      border-radius: 8px;
+      padding: 24px 16px;
+      text-align: center;
+      cursor: pointer;
+      background-color: rgba(15, 23, 42, 0.5);
+      transition: all 0.2s;
+    }
+
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--primary);
+      background-color: rgba(56, 189, 248, 0.05);
+    }
+
+    .dropzone p {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    .presets-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .btn-preset {
+      background-color: var(--card-dark);
+      border: 1px solid var(--border-dark);
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-preset:hover {
+      color: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .manual-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .manual-row input {
+      flex: 1;
+      background-color: var(--bg-dark);
+      border: 1px solid var(--border-dark);
+      border-radius: 6px;
+      color: var(--text-main);
+      padding: 8px 12px;
+      font-size: 0.85rem;
+      font-family: monospace;
+    }
+
+    .btn-action {
+      background-color: var(--primary);
+      color: #04121e;
+      border: none;
+      padding: 10px 16px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn-action:hover {
+      background-color: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-action:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-accent {
+      background-color: var(--accent);
+      color: #042114;
+    }
+
+    .btn-accent:hover {
+      background-color: var(--accent-hover);
+    }
+
+    .btn-danger {
+      background-color: rgba(239, 68, 68, 0.15);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      padding: 6px 12px;
+      font-size: 0.8rem;
+    }
+
+    .btn-danger:hover {
+      background-color: var(--danger);
+      color: #fff;
+    }
+
+    .stops-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 220px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .stops-container::-webkit-scrollbar {
+      width: 6px;
+    }
+    .stops-container::-webkit-scrollbar-thumb {
+      background: var(--border-dark);
+      border-radius: 4px;
+    }
+
+    .stop-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background-color: var(--bg-dark);
+      border: 1px solid var(--border-dark);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      font-family: monospace;
+    }
+
+    .stop-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .stop-idx {
+      width: 22px;
+      height: 22px;
+      background-color: var(--card-dark);
+      color: var(--primary);
+      border: 1px solid var(--border-dark);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      font-weight: bold;
+    }
+
+    .btn-icon-del {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: color 0.15s;
+    }
+
+    .btn-icon-del:hover {
+      color: var(--danger);
+    }
+
+    /* Map & Output Panel */
+    .map-container-wrapper {
+      height: 480px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border-dark);
+      position: relative;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+      background-color: #0b1320;
+    }
+
+    .results-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+    }
+
+    .metric-card {
+      background-color: var(--bg-dark);
+      border: 1px solid var(--border-dark);
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .metric-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .metric-val {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .export-card {
+      background-color: var(--bg-dark);
+      border: 1px solid var(--border-dark);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .export-left {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+      min-width: 250px;
+    }
+
+    .export-url-input {
+      width: 100%;
+      padding: 8px 10px;
+      background-color: #121d30;
+      border: 1px solid var(--border-dark);
+      border-radius: 6px;
+      color: var(--text-main);
+      font-family: monospace;
+      font-size: 0.78rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .export-buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .qr-box {
+      width: 120px;
+      height: 120px;
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    .qr-box canvas, .qr-box img {
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    /* Toast notification */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background-color: var(--card-dark);
+      border: 1px solid var(--primary);
+      color: var(--text-main);
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 9999;
+    }
+
+    #toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    footer {
+      border-top: 1px solid var(--border-dark);
+      padding: 12px 28px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">🗺️</div>
+      <div>
+        <div class="brand-title">Rout-o-Rooter <span>Web GUI</span> <span class="badge">v0.2.1</span></div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span class="badge badge-status" id="backend-status">Checking Mode...</span>
+      <div class="header-links">
+        <a href="https://github.com/fied1k/rout-o-rooter" target="_blank">GitHub</a>
+        <a href="HANDOVER.md" target="_blank">Handover</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Grid Workspace -->
+  <main class="main-container">
+    
+    <!-- Left Ingestion & Staging Panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span>📥 Ingest Payload</span>
+        </div>
+        <div class="presets-row">
+          <button class="btn-preset" onclick="loadPreset('kc')">Kansas City</button>
+          <button class="btn-preset" onclick="loadPreset('nyc')">NYC Metro</button>
+          <button class="btn-preset" onclick="loadPreset('sf')">SF Bay</button>
+        </div>
+      </div>
+
+      <!-- Ingestion Method Tabs -->
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('text')">Text / Paste</button>
+        <button class="tab-btn" onclick="switchTab('file')">Upload File</button>
+        <button class="tab-btn" onclick="switchTab('manual')">Manual</button>
+      </div>
+
+      <!-- Tab 1: Raw Text -->
+      <div id="tab-text" class="tab-content active">
+        <textarea id="raw-input" placeholder="Paste coordinates or free text here, e.g.:
+Stop 1: 38.9806, -94.6730
+Drop 2: 39.0997, -94.5786
+Drop 3: 39.1141, -94.6275
+Drop 4: 38.9282, -94.7214"></textarea>
+        <button class="btn-action" onclick="parseTextPayload()">⚡ Parse Coordinates</button>
+      </div>
+
+      <!-- Tab 2: File Upload (CSV, JSON, TXT, Images) -->
+      <div id="tab-file" class="tab-content">
+        <div class="dropzone" id="dropzone" onclick="document.getElementById('file-picker').click()">
+          <div style="font-size: 28px;">📂</div>
+          <strong>Drag & drop file or click to browse</strong>
+          <p>Supports .csv, .json, .txt, or images (.png, .jpg)</p>
+          <input type="file" id="file-picker" class="file-input" accept=".csv,.json,.txt,.png,.jpg,.jpeg,.webp" onchange="handleFileSelect(event)" />
+        </div>
+      </div>
+
+      <!-- Tab 3: Manual Input -->
+      <div id="tab-manual" class="tab-content">
+        <div class="manual-row">
+          <input type="number" step="any" id="manual-lat" placeholder="Latitude (e.g. 38.9806)" />
+          <input type="number" step="any" id="manual-lon" placeholder="Longitude (e.g. -94.6730)" />
+        </div>
+        <button class="btn-action" onclick="addManualStop()">+ Add Stop</button>
+      </div>
+
+      <!-- Staged Stops Header -->
+      <div class="panel-header" style="margin-top: 6px;">
+        <div class="panel-title">
+          <span>📍 Staged Waypoints (<span id="stop-count">0</span>)</span>
+        </div>
+        <button class="btn-action btn-danger" onclick="clearStops()">Clear All</button>
+      </div>
+
+      <!-- Staged Stops List -->
+      <div class="stops-container" id="stops-list">
+        <div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 24px 0;">
+          No waypoints staged yet. Ingest raw text or load a sample above.
+        </div>
+      </div>
+
+      <!-- Optimize Action -->
+      <button class="btn-action btn-accent" id="btn-optimize" onclick="optimizeCurrentRoute()" style="margin-top: auto; padding: 14px;">
+        🚀 Optimize Route (OSRM TSP Solver)
+      </button>
+    </div>
+
+    <!-- Right Map & Output Presentation Panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span>🗺️ Interactive Map & Navigation Route</span>
+        </div>
+        <div id="route-status" style="font-size: 0.82rem; color: var(--text-muted);">Ready</div>
+      </div>
+
+      <!-- Leaflet Map Container -->
+      <div class="map-container-wrapper">
+        <div id="map"></div>
+      </div>
+
+      <!-- Routing Metrics Row -->
+      <div class="results-row">
+        <div class="metric-card">
+          <div class="metric-label">Stops</div>
+          <div class="metric-val" id="metric-stops">-</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Distance</div>
+          <div class="metric-val" id="metric-distance">-</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Est. Duration</div>
+          <div class="metric-val" id="metric-duration">-</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Algorithm</div>
+          <div class="metric-val" style="font-size: 0.95rem; color: var(--accent);">OSRM Trip API</div>
+        </div>
+      </div>
+
+      <!-- Google Maps Link & QR Code Export Area -->
+      <div class="export-card" id="export-card">
+        <div class="export-left">
+          <div style="font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 6px;">
+            <span>📱 Universal Mobile Navigation Handoff</span>
+          </div>
+          <input type="text" class="export-url-input" id="export-url" readonly value="Optimization required to generate URL" />
+          <div class="export-buttons">
+            <button class="btn-action" id="btn-open-maps" onclick="openGoogleMaps()" disabled>
+              ↗ Open in Google Maps
+            </button>
+            <button class="btn-preset" onclick="copyMapsUrl()">📋 Copy URL</button>
+          </div>
+        </div>
+        <div style="text-align: center;">
+          <div class="qr-box" id="qrcode"></div>
+          <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 6px;">Scan to navigate</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Status Toast -->
+  <div id="toast">Message here</div>
+
+  <footer>
+    <div>Rout-o-Rooter v0.2.1 • Zero-Cost Open Source Route Optimization</div>
+    <div>Powered by Open Source Routing Machine (OSRM) & Google Maps URL Schema</div>
+  </footer>
+
+  <script>
+    // State management
+    let currentCoords = [];
+    let map = null;
+    let markersLayer = null;
+    let routeLayer = null;
+    let qrCodeInstance = null;
+    let backendOnline = false;
+
+    // Presets
+    const PRESETS = {
+      kc: [
+        [38.9806, -94.6730], // Overland Park
+        [39.0997, -94.5786], // Downtown Kansas City
+        [39.1141, -94.6275], // Kansas City KS
+        [38.9282, -94.7214]  // Olathe
+      ],
+      nyc: [
+        [40.7128, -74.0060], // Lower Manhattan
+        [40.7589, -73.9851], // Times Square
+        [40.7829, -73.9654], // Central Park
+        [40.6782, -73.9442]  // Brooklyn
+      ],
+      sf: [
+        [37.7749, -122.4194], // San Francisco
+        [37.8044, -122.2712], // Oakland
+        [37.8715, -122.2730], // Berkeley
+        [37.5483, -122.3130]  // San Mateo
+      ]
+    };
+
+    // Initialize Map and check backend
+    window.addEventListener('DOMContentLoaded', () => {
+      initMap();
+      initQR();
+      setupDropzone();
+      checkBackend();
+      loadPreset('kc');
+    });
+
+    function checkBackend() {
+      const badge = document.getElementById('backend-status');
+      fetch('/api/status')
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'online') {
+            backendOnline = true;
+            badge.textContent = '🟢 Python Engine Connected (OCR Ready)';
+            badge.classList.add('connected');
+          }
+        })
+        .catch(() => {
+          backendOnline = false;
+          badge.textContent = '🌐 Standalone Browser Mode (Direct OSRM)';
+          badge.classList.remove('connected');
+        });
+    }
+
+    function initMap() {
+      map = L.map('map', {
+        zoomControl: true,
+        attributionControl: false
+      }).setView([39.0997, -94.5786], 11);
+
+      // Dark theme map tiles
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19
+      }).addTo(map);
+
+      markersLayer = L.layerGroup().addTo(map);
+      routeLayer = L.layerGroup().addTo(map);
+    }
+
+    function initQR() {
+      const qrEl = document.getElementById("qrcode");
+      qrEl.innerHTML = "";
+      qrCodeInstance = new QRCode(qrEl, {
+        text: "https://maps.google.com",
+        width: 108,
+        height: 108,
+        colorDark: "#0f172a",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    // Tabs
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+      if (tabName === 'text') {
+        document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        document.getElementById('tab-text').classList.add('active');
+      } else if (tabName === 'file') {
+        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        document.getElementById('tab-file').classList.add('active');
+      } else {
+        document.querySelectorAll('.tab-btn')[2].classList.add('active');
+        document.getElementById('tab-manual').classList.add('active');
+      }
+    }
+
+    // Presets
+    function loadPreset(key) {
+      if (PRESETS[key]) {
+        currentCoords = [...PRESETS[key]];
+        renderStopsList();
+        updateMapMarkers();
+        showToast(`Loaded ${key.toUpperCase()} sample coordinates`);
+      }
+    }
+
+    // Coordinate parsing regex matching core python engine
+    const COORD_REGEX = /(-?\d{1,2}\.\d+)[,\s]+(-?\d{1,3}\.\d+)/g;
+
+    function parseTextPayload() {
+      const text = document.getElementById('raw-input').value;
+      if (!text.trim()) {
+        showToast("Please paste coordinate text first");
+        return;
+      }
+      const matches = [...text.matchAll(COORD_REGEX)];
+      if (!matches.length) {
+        showToast("No valid coordinates found in text");
+        return;
+      }
+      currentCoords = matches.map(m => [parseFloat(m[1]), parseFloat(m[2])]);
+      renderStopsList();
+      updateMapMarkers();
+      showToast(`Parsed ${currentCoords.length} coordinates successfully`);
+    }
+
+    // Manual stop
+    function addManualStop() {
+      const lat = parseFloat(document.getElementById('manual-lat').value);
+      const lon = parseFloat(document.getElementById('manual-lon').value);
+      if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+        showToast("Invalid Latitude (-90 to 90) or Longitude (-180 to 180)");
+        return;
+      }
+      currentCoords.push([lat, lon]);
+      document.getElementById('manual-lat').value = '';
+      document.getElementById('manual-lon').value = '';
+      renderStopsList();
+      updateMapMarkers();
+      showToast("Stop added");
+    }
+
+    // Dropzone & File parsing
+    function setupDropzone() {
+      const dropzone = document.getElementById('dropzone');
+      ['dragenter', 'dragover'].forEach(event => {
+        dropzone.addEventListener(event, (e) => {
+          e.preventDefault();
+          dropzone.classList.add('dragover');
+        });
+      });
+      ['dragleave', 'drop'].forEach(event => {
+        dropzone.addEventListener(event, (e) => {
+          e.preventDefault();
+          dropzone.classList.remove('dragover');
+        });
+      });
+      dropzone.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length) processFile(files[0]);
+      });
+    }
+
+    function handleFileSelect(e) {
+      if (e.target.files.length) {
+        processFile(e.target.files[0]);
+      }
+    }
+
+    function processFile(file) {
+      const ext = file.name.split('.').pop().toLowerCase();
+
+      // Check if image format
+      if (['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tiff'].includes(ext)) {
+        if (!backendOnline) {
+          showToast("Image OCR requires running web_server.py (Python backend)");
+          return;
+        }
+
+        showToast(`Uploading ${file.name} for OCR processing...`);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          fetch('/api/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filename: file.name,
+              base64: e.target.result
+            })
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.coords && data.coords.length) {
+              currentCoords = data.coords;
+              renderStopsList();
+              updateMapMarkers();
+              showToast(`OCR successfully extracted ${data.coords.length} coordinates!`);
+            } else {
+              showToast(data.error || "No coordinates detected in image via OCR.");
+            }
+          })
+          .catch(err => {
+            showToast("OCR request failed: " + err.message);
+          });
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      // JSON files
+      const reader = new FileReader();
+      if (ext === 'json') {
+        reader.onload = (e) => {
+          try {
+            const data = JSON.parse(e.target.result);
+            let coords = [];
+            if (Array.isArray(data)) {
+              data.forEach(item => {
+                if (Array.isArray(item) && item.length >= 2) {
+                  coords.push([parseFloat(item[0]), parseFloat(item[1])]);
+                } else if (typeof item === 'object') {
+                  const lat = item.lat || item.latitude;
+                  const lon = item.lon || item.lng || item.longitude;
+                  if (lat && lon) coords.push([parseFloat(lat), parseFloat(lon)]);
+                }
+              });
+            }
+            if (coords.length) {
+              currentCoords = coords;
+              renderStopsList();
+              updateMapMarkers();
+              showToast(`Ingested ${coords.length} stops from JSON`);
+            } else {
+              showToast("No valid coordinates found in JSON");
+            }
+          } catch (err) {
+            showToast("Failed to parse JSON file");
+          }
+        };
+        reader.readAsText(file);
+      } else {
+        // CSV or TXT
+        reader.onload = (e) => {
+          const text = e.target.result;
+          const matches = [...text.matchAll(COORD_REGEX)];
+          if (matches.length) {
+            currentCoords = matches.map(m => [parseFloat(m[1]), parseFloat(m[2])]);
+            renderStopsList();
+            updateMapMarkers();
+            showToast(`Ingested ${currentCoords.length} coordinates from ${file.name}`);
+          } else {
+            showToast("No coordinates found in file");
+          }
+        };
+        reader.readAsText(file);
+      }
+    }
+
+    // Render Staged Stops List
+    function renderStopsList() {
+      const container = document.getElementById('stops-list');
+      document.getElementById('stop-count').textContent = currentCoords.length;
+
+      if (!currentCoords.length) {
+        container.innerHTML = `<div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 24px 0;">No waypoints staged yet.</div>`;
+        return;
+      }
+
+      container.innerHTML = currentCoords.map((c, i) => `
+        <div class="stop-card">
+          <div class="stop-left">
+            <span class="stop-idx">${i + 1}</span>
+            <span>${c[0].toFixed(5)}, ${c[1].toFixed(5)}</span>
+          </div>
+          <button class="btn-icon-del" onclick="deleteStop(${i})" title="Remove Stop">✕</button>
+        </div>
+      `).join('');
+    }
+
+    function deleteStop(index) {
+      currentCoords.splice(index, 1);
+      renderStopsList();
+      updateMapMarkers();
+    }
+
+    function clearStops() {
+      currentCoords = [];
+      renderStopsList();
+      markersLayer.clearLayers();
+      routeLayer.clearLayers();
+      resetMetrics();
+      showToast("Cleared all stops");
+    }
+
+    function updateMapMarkers() {
+      markersLayer.clearLayers();
+      routeLayer.clearLayers();
+
+      if (!currentCoords.length) return;
+
+      const bounds = [];
+      currentCoords.forEach((coord, i) => {
+        bounds.push(coord);
+        const icon = L.divIcon({
+          className: 'custom-map-pin',
+          html: `<div style="background:#38bdf8;color:#0f172a;border:2px solid #fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:11px;box-shadow:0 2px 6px rgba(0,0,0,0.5);">${i + 1}</div>`,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        });
+        L.marker(coord, { icon: icon })
+          .bindPopup(`<b>Stop ${i + 1}</b><br>${coord[0].toFixed(5)}, ${coord[1].toFixed(5)}`)
+          .addTo(markersLayer);
+      });
+
+      if (bounds.length) {
+        map.fitBounds(bounds, { padding: [40, 40] });
+      }
+    }
+
+    // TSP Route Optimization via OSRM Trip API
+    async function optimizeCurrentRoute() {
+      if (currentCoords.length < 2) {
+        showToast("Please stage at least 2 waypoints to optimize");
+        return;
+      }
+
+      const btn = document.getElementById('btn-optimize');
+      const status = document.getElementById('route-status');
+      btn.disabled = true;
+      btn.innerHTML = "⏳ Computing TSP Route...";
+      status.textContent = "Querying OSRM Trip API...";
+
+      try {
+        // Format for OSRM: {longitude},{latitude}
+        const coordString = currentCoords.map(c => `${c[1]},${c[0]}`).join(';');
+        const url = `https://router.project-osrm.org/trip/v1/driving/${coordString}?roundtrip=false&source=first&overview=full&geometries=geojson`;
+
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("OSRM routing server responded with error");
+
+        const data = await response.json();
+        if (data.code !== "Ok" || !data.trips || !data.trips.length) {
+          throw new Error("Route optimization returned no viable solution");
+        }
+
+        const trip = data.trips[0];
+        const waypoints = data.waypoints;
+
+        // Sort waypoints by waypoint_index to get optimized stop sequence
+        waypoints.sort((a, b) => a.waypoint_index - b.waypoint_index);
+        const optimizedCoords = waypoints.map(wp => [wp.location[1], wp.location[0]]);
+
+        // Update state
+        currentCoords = optimizedCoords;
+        renderStopsList();
+        updateMapMarkers();
+
+        // Draw driving geometry polyline
+        if (trip.geometry && trip.geometry.coordinates) {
+          const latLngs = trip.geometry.coordinates.map(c => [c[1], c[0]]);
+          routeLayer.clearLayers();
+          const polyline = L.polyline(latLngs, {
+            color: '#10b981',
+            weight: 5,
+            opacity: 0.9,
+            dashArray: null
+          }).addTo(routeLayer);
+          map.fitBounds(polyline.getBounds(), { padding: [40, 40] });
+        }
+
+        // Metrics
+        const distanceKm = (trip.distance / 1000).toFixed(1);
+        const distanceMi = (trip.distance / 1609.34).toFixed(1);
+        const durationMin = Math.round(trip.duration / 60);
+
+        document.getElementById('metric-stops').textContent = currentCoords.length;
+        document.getElementById('metric-distance').textContent = `${distanceMi} mi (${distanceKm} km)`;
+        document.getElementById('metric-duration').textContent = `${durationMin} mins`;
+
+        // Generate Google Maps URL
+        const mapsUrl = buildGoogleMapsUrl(currentCoords);
+        document.getElementById('export-url').value = mapsUrl;
+        document.getElementById('btn-open-maps').disabled = false;
+
+        // Render QR Code
+        updateQRCode(mapsUrl);
+
+        status.textContent = "Route optimized successfully";
+        showToast("Route optimized via OSRM TSP solver!");
+      } catch (err) {
+        console.error(err);
+        status.textContent = "Optimization failed";
+        showToast("Optimization error: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = "🚀 Optimize Route (OSRM TSP Solver)";
+      }
+    }
+
+    function buildGoogleMapsUrl(coords) {
+      if (coords.length < 2) return "";
+      const origin = `${coords[0][0]},${coords[0][1]}`;
+      const destination = `${coords[coords.length - 1][0]},${coords[coords.length - 1][1]}`;
+      const waypoints = coords.slice(1, -1).map(c => `${c[0]},${c[1]}`).join('|');
+
+      const params = new URLSearchParams({
+        api: "1",
+        origin: origin,
+        destination: destination
+      });
+      if (waypoints) {
+        params.append("waypoints", waypoints);
+      }
+      return `https://www.google.com/maps/dir/?${params.toString()}`;
+    }
+
+    function updateQRCode(url) {
+      if (qrCodeInstance) {
+        qrCodeInstance.clear();
+        qrCodeInstance.makeCode(url);
+      }
+    }
+
+    function openGoogleMaps() {
+      const url = document.getElementById('export-url').value;
+      if (url && url.startsWith('http')) {
+        window.open(url, '_blank');
+      }
+    }
+
+    function copyMapsUrl() {
+      const url = document.getElementById('export-url').value;
+      if (!url || !url.startsWith('http')) {
+        showToast("No active route URL to copy");
+        return;
+      }
+      navigator.clipboard.writeText(url).then(() => {
+        showToast("Copied Google Maps URL to clipboard!");
+      }).catch(() => {
+        showToast("Failed to copy URL");
+      });
+    }
+
+    function resetMetrics() {
+      document.getElementById('metric-stops').textContent = '-';
+      document.getElementById('metric-distance').textContent = '-';
+      document.getElementById('metric-duration').textContent = '-';
+      document.getElementById('export-url').value = 'Optimization required to generate URL';
+      document.getElementById('btn-open-maps').disabled = true;
+      document.getElementById('route-status').textContent = 'Ready';
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3000);
+    }
+  </script>
+</body>
+</html>

@@ -4,6 +4,7 @@ A zero-cost route optimization pipeline that ingests raw coordinate data via tex
 
 ## Features
 * **Zero Cost Engine:** Free OSRM Trip API for route sequencing.
+* **Modern Web GUI:** Interactive Leaflet map, drag-and-drop file upload, instant OSRM routing, live scannable QR codes, and Google Maps handoff.
 * **Flexible Ingestion:** Direct file upload (.csv, .json, .txt), plain text strings, IMAP email polling, and image OCR via Tesseract.
 * **Universal Output:** Web-ready Google Maps multi-stop links and generated QR codes.
 * **Integrated Testing:** Self-testing `unittest` suite validating parsing, file ingestion, and routing before deployment.
@@ -19,7 +20,24 @@ A zero-cost route optimization pipeline that ingests raw coordinate data via tex
    ```
 
 ## Usage
+
+### 1. Web GUI (Interactive Interface)
+Launch the local web server with full Python OCR engine connectivity:
+```bash
+python web_server.py
+```
+This serves `index.html` at `http://localhost:8080` and automatically opens your browser.
+
+*Note: You can also open `index.html` directly in any web browser to run in zero-server standalone mode with client-side OSRM routing.*
+
+### 2. Command-Line & Self-Testing
 Run the built-in test suite:
 ```bash
 python route_optimizer.py
+```
+
+### 3. Background Email Listener
+Monitor an IMAP inbox for incoming coordinate payloads:
+```bash
+python email_listener.py
 ```
