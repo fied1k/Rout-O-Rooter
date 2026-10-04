@@ -252,12 +252,6 @@
       display: none;
     }
 
-    .presets-row {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-
     .btn-preset {
       background-color: var(--card-dark);
       border: 1px solid var(--border-dark);
@@ -582,20 +576,112 @@
     }
 
     .qr-box {
-      width: 120px;
-      height: 120px;
+      width: 200px;
+      height: 200px;
       background: #ffffff;
-      border-radius: 8px;
-      padding: 6px;
+      border: 4px solid #ffffff;
+      border-radius: 4px;
+      padding: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .qr-box:hover {
+      transform: scale(1.02);
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.25);
     }
 
     .qr-box canvas, .qr-box img {
-      max-width: 100%;
-      max-height: 100%;
+      width: 168px !important;
+      height: 168px !important;
+      display: block !important;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+    }
+
+    /* High-Resolution QR Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background-color: rgba(5, 8, 15, 0.85);
+      backdrop-filter: blur(4px);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--card-dark);
+      border: 1px solid var(--border-dark);
+      border-radius: 12px;
+      max-width: 440px;
+      width: 100%;
+      padding: 24px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      animation: modalFadeIn 0.2s ease-out;
+    }
+
+    @keyframes modalFadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.5rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0 4px;
+      transition: color 0.15s;
+    }
+
+    .modal-close:hover {
+      color: var(--text-main);
+    }
+
+    .qr-modal-box {
+      width: 320px;
+      height: 320px;
+      background: #ffffff;
+      border: 8px solid #ffffff;
+      border-radius: 4px;
+      padding: 12px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+    }
+
+    .qr-modal-box canvas, .qr-modal-box img {
+      width: 280px !important;
+      height: 280px !important;
+      display: block !important;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
     }
 
     /* Toast notification */
@@ -661,12 +747,6 @@
       <div class="panel-header">
         <div class="panel-title">
           <span>📥 Ingest Payload</span>
-        </div>
-        <div class="presets-row">
-          <button class="btn-preset" onclick="loadPreset('kc')">Kansas City</button>
-          <button class="btn-preset" onclick="loadPreset('tulsa')">Tulsa (coord1)</button>
-          <button class="btn-preset" onclick="loadPreset('nyc')">NYC Metro</button>
-          <button class="btn-preset" onclick="loadPreset('sf')">SF Bay</button>
         </div>
       </div>
 
@@ -827,14 +907,44 @@ Drop 4: 38.9282, -94.7214"></textarea>
             <button class="btn-preset" id="btn-open-all-parts" style="display: none;" onclick="openAllPartsInTabs()">📑 Open All Parts in Tabs</button>
           </div>
         </div>
-        <div style="text-align: center;">
-          <div class="qr-box" id="qrcode"></div>
-          <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 6px;" id="qr-label">Scan for Google Maps</div>
+        <div style="text-align: center; display: flex; flex-direction: column; align-items: center;">
+          <div class="qr-box" id="qrcode" onclick="openQrModal()" title="Click to enlarge QR code"></div>
+          <div style="display: flex; gap: 8px; align-items: center; justify-content: center; margin-top: 8px; flex-wrap: wrap;">
+            <span style="font-size: 0.74rem; color: var(--text-muted); font-weight: 500;" id="qr-label">Scan for Google Maps</span>
+            <button class="btn-preset" style="padding: 2px 8px; font-size: 0.7rem;" onclick="openQrModal()" title="View large QR code">🔍 Enlarge</button>
+            <button class="btn-preset" style="padding: 2px 8px; font-size: 0.7rem;" onclick="downloadQrPng()" title="Download QR as PNG">⬇️ Save</button>
+          </div>
         </div>
       </div>
     </div>
 
   </main>
+
+  <!-- High-Resolution QR Modal -->
+  <div id="qr-modal" class="modal-overlay" onclick="closeQrModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div style="font-weight: 600; font-size: 1rem; color: var(--text-main);">
+          📱 High-Resolution Navigation QR
+        </div>
+        <button class="modal-close" onclick="closeQrModal()">&times;</button>
+      </div>
+      <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px;">
+        Scan with your phone's camera app to open directions immediately.
+      </div>
+      <div class="qr-modal-box">
+        <div id="modal-qrcode"></div>
+      </div>
+      <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 10px;" id="modal-qr-label">
+        Google Maps Navigation Link
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: center; flex-wrap: wrap;">
+        <button class="btn-action" style="padding: 8px 16px;" onclick="downloadQrPng()">⬇️ Download PNG</button>
+        <button class="btn-preset" style="padding: 8px 16px;" onclick="copyMapsUrl()">📋 Copy Link</button>
+        <button class="btn-preset" style="padding: 8px 16px;" onclick="closeQrModal()">✕ Close</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Status Toast -->
   <div id="toast">Message here</div>
@@ -861,50 +971,6 @@ Drop 4: 38.9282, -94.7214"></textarea>
     let routeSegments = [];
     let currentSegmentIndex = 0;
 
-    // Presets
-    const PRESETS = {
-      kc: [
-        [38.9806, -94.6730], // Overland Park
-        [39.0997, -94.5786], // Downtown Kansas City
-        [39.1141, -94.6275], // Kansas City KS
-        [38.9282, -94.7214]  // Olathe
-      ],
-      tulsa: [
-        [36.162700, -95.991200], // I-244 & N MLK Jr Blvd
-        [36.148800, -96.002500], // US-75 & W 7th St
-        [36.164500, -95.986500], // I-244 & US-75 Interchange
-        [36.148200, -95.975400], // Route 66 & S Peoria Ave
-        [36.136800, -95.966400], // Broken Arrow Expy & Utica
-        [36.160800, -95.922100], // I-244 & S Yale Ave
-        [36.084100, -96.007600], // I-44 & US-75
-        [36.126500, -95.940500], // Broken Arrow Expy & Harvard
-        [36.088600, -95.922100], // I-44 & S Yale Ave
-        [36.132800, -95.867200], // Mingo Valley & E 21st St
-        [36.060500, -95.867500], // US-169 & E 71st St
-        [36.017200, -95.887200], // Creek Turnpike & Memorial
-        [36.139800, -96.110500], // Sand Springs
-        [36.024500, -96.002800], // Jenks
-        [35.958700, -96.003100], // Glenpool
-        [36.026700, -96.134200], // Sapulpa
-        [36.052600, -95.791500], // Broken Arrow
-        [35.942700, -95.886700], // Bixby
-        [36.269200, -95.854300], // Owasso
-        [36.312500, -95.610500]  // Claremore
-      ],
-      nyc: [
-        [40.7128, -74.0060], // Lower Manhattan
-        [40.7589, -73.9851], // Times Square
-        [40.7829, -73.9654], // Central Park
-        [40.6782, -73.9442]  // Brooklyn
-      ],
-      sf: [
-        [37.7749, -122.4194], // San Francisco
-        [37.8044, -122.2712], // Oakland
-        [37.8715, -122.2730], // Berkeley
-        [37.5483, -122.3130]  // San Mateo
-      ]
-    };
-
     // Initialize Map and check backend
     window.addEventListener('DOMContentLoaded', () => {
       initMap();
@@ -923,6 +989,7 @@ Drop 4: 38.9282, -94.7214"></textarea>
             backendOnline = true;
             badge.textContent = '🟢 Python Engine Connected (OCR Ready)';
             badge.classList.add('connected');
+            updateProviderDisplay();
           }
         })
         .catch(() => {
@@ -951,16 +1018,7 @@ Drop 4: 38.9282, -94.7214"></textarea>
     }
 
     function initQR() {
-      const qrEl = document.getElementById("qrcode");
-      qrEl.innerHTML = "";
-      qrCodeInstance = new QRCode(qrEl, {
-        text: "https://maps.google.com",
-        width: 108,
-        height: 108,
-        colorDark: "#0f172a",
-        colorLight: "#ffffff",
-        correctLevel: QRCode.CorrectLevel.M
-      });
+      updateQRCode("https://maps.google.com");
     }
 
     // Tabs
@@ -977,16 +1035,6 @@ Drop 4: 38.9282, -94.7214"></textarea>
       } else {
         document.querySelectorAll('.tab-btn')[2].classList.add('active');
         document.getElementById('tab-manual').classList.add('active');
-      }
-    }
-
-    // Presets
-    function loadPreset(key) {
-      if (PRESETS[key]) {
-        currentCoords = [...PRESETS[key]];
-        renderStopsList();
-        updateMapMarkers();
-        showToast(`Loaded ${key.toUpperCase()} sample coordinates`);
       }
     }
 
@@ -1590,10 +1638,125 @@ Drop 4: 38.9282, -94.7214"></textarea>
     }
 
     function updateQRCode(url) {
-      if (qrCodeInstance) {
-        qrCodeInstance.clear();
-        qrCodeInstance.makeCode(url);
+      const qrEl = document.getElementById("qrcode");
+      if (!qrEl) return;
+      qrEl.innerHTML = "";
+      const targetUrl = url || "https://maps.google.com";
+
+      if (backendOnline) {
+        // High-resolution ISO/IEC 18004 compliant PNG generated with Python qrcode (quiet zone border=4)
+        const img = document.createElement("img");
+        img.src = `/api/qr?url=${encodeURIComponent(targetUrl)}&t=${Date.now()}`;
+        img.alt = "Navigation QR Code";
+        img.style.width = "168px";
+        img.style.height = "168px";
+        img.style.display = "block";
+        img.style.imageRendering = "pixelated";
+        qrEl.appendChild(img);
+      } else {
+        // High-resolution client-side rendering with CorrectLevel.L (7%)
+        // Level L provides maximum module size & optical clarity on screen scans
+        qrCodeInstance = new QRCode(qrEl, {
+          text: targetUrl,
+          width: 336,
+          height: 336,
+          colorDark: "#000000",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.L
+        });
       }
+
+      updateModalQR(targetUrl);
+    }
+
+    function updateModalQR(url) {
+      const modalEl = document.getElementById("modal-qrcode");
+      if (!modalEl) return;
+      modalEl.innerHTML = "";
+      const targetUrl = url || "https://maps.google.com";
+
+      if (backendOnline) {
+        const img = document.createElement("img");
+        img.src = `/api/qr?url=${encodeURIComponent(targetUrl)}&t=${Date.now()}`;
+        img.alt = "Large Navigation QR Code";
+        img.style.width = "280px";
+        img.style.height = "280px";
+        img.style.display = "block";
+        img.style.imageRendering = "pixelated";
+        modalEl.appendChild(img);
+      } else {
+        new QRCode(modalEl, {
+          text: targetUrl,
+          width: 560,
+          height: 560,
+          colorDark: "#000000",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.L
+        });
+      }
+    }
+
+    function openQrModal() {
+      const modal = document.getElementById('qr-modal');
+      const activeUrl = (activeProvider === 'google' ? googleMapsUrl : appleMapsUrl) || "https://maps.google.com";
+      const providerTitle = activeProvider === 'google' ? 'Google Maps' : 'Apple Maps';
+      const partSuffix = routeSegments.length > 1 ? ` (Part ${currentSegmentIndex + 1})` : '';
+      
+      const label = document.getElementById('modal-qr-label');
+      if (label) label.textContent = `${providerTitle} Route Link${partSuffix}`;
+      
+      updateModalQR(activeUrl);
+      modal.classList.add('active');
+    }
+
+    function closeQrModal() {
+      const modal = document.getElementById('qr-modal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeQrModal();
+    });
+
+    function downloadQrPng() {
+      const activeUrl = (activeProvider === 'google' ? googleMapsUrl : appleMapsUrl) || "https://maps.google.com";
+      const partNum = routeSegments.length > 1 ? `_part${currentSegmentIndex + 1}` : '';
+      const filename = `rout_o_rooter_${activeProvider}${partNum}_qr.png`;
+
+      if (backendOnline) {
+        const link = document.createElement("a");
+        link.href = `/api/qr?url=${encodeURIComponent(activeUrl)}`;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast("Downloaded QR Code image");
+        return;
+      }
+
+      // Standalone browser mode: extract from canvas / img
+      const qrEl = document.getElementById("modal-qrcode") || document.getElementById("qrcode");
+      const img = qrEl.querySelector("img");
+      const canvas = qrEl.querySelector("canvas");
+      let dataUrl = "";
+      if (img && img.src && img.src.startsWith("data:image")) {
+        dataUrl = img.src;
+      } else if (canvas) {
+        dataUrl = canvas.toDataURL("image/png");
+      }
+
+      if (!dataUrl) {
+        showToast("QR Code image not available yet");
+        return;
+      }
+
+      const a = document.createElement("a");
+      a.download = filename;
+      a.href = dataUrl;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showToast("Downloaded QR Code image");
     }
 
     function openGoogleMaps() {
@@ -1640,6 +1803,7 @@ Drop 4: 38.9282, -94.7214"></textarea>
       document.getElementById('btn-open-google').disabled = true;
       document.getElementById('btn-open-apple').disabled = true;
       document.getElementById('route-status').textContent = 'Ready';
+      updateProviderDisplay();
     }
 
     function showToast(msg) {

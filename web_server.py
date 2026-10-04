@@ -7,11 +7,13 @@ import sys
 import json
 import base64
 import tempfile
+import io
 import webbrowser
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 from email.parser import BytesParser
 from email.policy import default
+import qrcode
 
 from route_optimizer import RouteOptimizer, __version__
 
@@ -38,6 +40,35 @@ class RoutORooterHandler(SimpleHTTPRequestHandler):
                 "ocr_support": True
             }
             self.wfile.write(json.dumps(status_data).encode("utf-8"))
+            return
+
+        elif parsed.path == "/api/qr":
+            query = parse_qs(parsed.query)
+            target_url = query.get("url", [""])[0]
+            if not target_url:
+                target_url = "https://maps.google.com"
+            try:
+                qr = qrcode.QRCode(
+                    version=None,
+                    error_correction=qrcode.constants.ERROR_CORRECT_L,
+                    box_size=10,
+                    border=4,
+                )
+                qr.add_data(target_url)
+                qr.make(fit=True)
+                img = qr.make_image(fill_color="black", back_color="white")
+                buf = io.BytesIO()
+                img.save(buf, format="PNG")
+                png_bytes = buf.getvalue()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+                self.send_header("Content-Length", str(len(png_bytes)))
+                self.end_headers()
+                self.wfile.write(png_bytes)
+            except Exception as e:
+                self._send_json(500, {"success": False, "error": str(e)})
             return
 
         # Default fallback to index.html for root path
