@@ -60,12 +60,14 @@ class RoutORooterHandler(SimpleHTTPRequestHandler):
 
                 optimized = optimizer.optimize_route(coords)
                 maps_url = optimizer.generate_google_maps_url(optimized)
+                apple_maps_url = optimizer.generate_apple_maps_url(optimized)
                 qr_path = optimizer.generate_qr(maps_url)
 
                 response_payload = {
                     "success": True,
                     "optimized_coords": optimized,
                     "google_maps_url": maps_url,
+                    "apple_maps_url": apple_maps_url,
                     "qr_path": qr_path
                 }
                 self._send_json(200, response_payload)

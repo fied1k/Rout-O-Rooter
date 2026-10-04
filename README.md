@@ -4,9 +4,9 @@ A zero-cost route optimization pipeline that ingests raw coordinate data via tex
 
 ## Features
 * **Zero Cost Engine:** Free OSRM Trip API for route sequencing.
-* **Modern Web GUI:** Interactive Leaflet map, drag-and-drop file upload, instant OSRM routing, live scannable QR codes, and Google Maps handoff.
+* **Modern Web GUI:** Interactive Leaflet map, drag-and-drop file upload, instant OSRM routing, live scannable QR codes, and dual Google Maps / Apple Maps handoff.
 * **Flexible Ingestion:** Direct file upload (.csv, .json, .txt), plain text strings, IMAP email polling, and image OCR via Tesseract.
-* **Universal Output:** Web-ready Google Maps multi-stop links and generated QR codes.
+* **Universal Output:** Web-ready Google Maps and Apple Maps multi-stop navigation links, and dynamic QR codes.
 * **Integrated Testing:** Self-testing `unittest` suite validating parsing, file ingestion, and routing before deployment.
 
 ## Installation

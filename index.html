@@ -667,23 +667,30 @@ Drop 4: 38.9282, -94.7214"></textarea>
         </div>
       </div>
 
-      <!-- Google Maps Link & QR Code Export Area -->
+      <!-- Google & Apple Maps Link & QR Code Export Area -->
       <div class="export-card" id="export-card">
         <div class="export-left">
-          <div style="font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 6px;">
+          <div style="font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
             <span>📱 Universal Mobile Navigation Handoff</span>
+            <div style="display: flex; gap: 4px;">
+              <button class="btn-preset active" id="tab-provider-google" onclick="setMapProvider('google')">Google Maps</button>
+              <button class="btn-preset" id="tab-provider-apple" onclick="setMapProvider('apple')">Apple Maps</button>
+            </div>
           </div>
           <input type="text" class="export-url-input" id="export-url" readonly value="Optimization required to generate URL" />
           <div class="export-buttons">
-            <button class="btn-action" id="btn-open-maps" onclick="openGoogleMaps()" disabled>
+            <button class="btn-action" id="btn-open-google" onclick="openGoogleMaps()" disabled>
               ↗ Open in Google Maps
+            </button>
+            <button class="btn-action" id="btn-open-apple" style="background-color: #334155; color: #f8fafc;" onclick="openAppleMaps()" disabled>
+              🍎 Open in Apple Maps
             </button>
             <button class="btn-preset" onclick="copyMapsUrl()">📋 Copy URL</button>
           </div>
         </div>
         <div style="text-align: center;">
           <div class="qr-box" id="qrcode"></div>
-          <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 6px;">Scan to navigate</div>
+          <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 6px;" id="qr-label">Scan for Google Maps</div>
         </div>
       </div>
     </div>
@@ -706,6 +713,9 @@ Drop 4: 38.9282, -94.7214"></textarea>
     let routeLayer = null;
     let qrCodeInstance = null;
     let backendOnline = false;
+    let googleMapsUrl = "";
+    let appleMapsUrl = "";
+    let activeProvider = "google";
 
     // Presets
     const PRESETS = {
@@ -1109,13 +1119,10 @@ Drop 4: 38.9282, -94.7214"></textarea>
         document.getElementById('metric-distance').textContent = `${distanceMi} mi (${distanceKm} km)`;
         document.getElementById('metric-duration').textContent = `${durationMin} mins`;
 
-        // Generate Google Maps URL
-        const mapsUrl = buildGoogleMapsUrl(currentCoords);
-        document.getElementById('export-url').value = mapsUrl;
-        document.getElementById('btn-open-maps').disabled = false;
-
-        // Render QR Code
-        updateQRCode(mapsUrl);
+        // Generate navigation links for both Google Maps and Apple Maps
+        googleMapsUrl = buildGoogleMapsUrl(currentCoords);
+        appleMapsUrl = buildAppleMapsUrl(currentCoords);
+        updateProviderDisplay();
 
         status.textContent = "Route optimized successfully";
         showToast("Route optimized via OSRM TSP solver!");
@@ -1146,6 +1153,54 @@ Drop 4: 38.9282, -94.7214"></textarea>
       return `https://www.google.com/maps/dir/?${params.toString()}`;
     }
 
+    function buildAppleMapsUrl(coords) {
+      if (coords.length < 2) return "";
+      const saddr = `${coords[0][0]},${coords[0][1]}`;
+      let daddr = "";
+      if (coords.length === 2) {
+        daddr = `${coords[1][0]},${coords[1][1]}`;
+      } else {
+        daddr = coords.slice(1).map(c => `${c[0]},${c[1]}`).join('+to:');
+      }
+      return `https://maps.apple.com/?saddr=${saddr}&daddr=${daddr}&dirflg=d`;
+    }
+
+    function setMapProvider(provider) {
+      activeProvider = provider;
+      updateProviderDisplay();
+    }
+
+    function updateProviderDisplay() {
+      const googleBtn = document.getElementById('tab-provider-google');
+      const appleBtn = document.getElementById('tab-provider-apple');
+      const urlInput = document.getElementById('export-url');
+      const btnOpenGoogle = document.getElementById('btn-open-google');
+      const btnOpenApple = document.getElementById('btn-open-apple');
+      const qrLabel = document.getElementById('qr-label');
+
+      if (activeProvider === 'google') {
+        googleBtn.classList.add('active');
+        appleBtn.classList.remove('active');
+        urlInput.value = googleMapsUrl || "Optimization required to generate URL";
+        if (qrLabel) qrLabel.textContent = "Scan for Google Maps";
+        if (googleMapsUrl) updateQRCode(googleMapsUrl);
+      } else {
+        appleBtn.classList.add('active');
+        googleBtn.classList.remove('active');
+        urlInput.value = appleMapsUrl || "Optimization required to generate URL";
+        if (qrLabel) qrLabel.textContent = "Scan for Apple Maps";
+        if (appleMapsUrl) updateQRCode(appleMapsUrl);
+      }
+
+      if (googleMapsUrl) {
+        btnOpenGoogle.disabled = false;
+        btnOpenApple.disabled = false;
+      } else {
+        btnOpenGoogle.disabled = true;
+        btnOpenApple.disabled = true;
+      }
+    }
+
     function updateQRCode(url) {
       if (qrCodeInstance) {
         qrCodeInstance.clear();
@@ -1154,31 +1209,44 @@ Drop 4: 38.9282, -94.7214"></textarea>
     }
 
     function openGoogleMaps() {
-      const url = document.getElementById('export-url').value;
-      if (url && url.startsWith('http')) {
-        window.open(url, '_blank');
+      if (googleMapsUrl && googleMapsUrl.startsWith('http')) {
+        window.open(googleMapsUrl, '_blank');
+      } else {
+        showToast("Please optimize route first");
+      }
+    }
+
+    function openAppleMaps() {
+      if (appleMapsUrl && appleMapsUrl.startsWith('http')) {
+        window.open(appleMapsUrl, '_blank');
+      } else {
+        showToast("Please optimize route first");
       }
     }
 
     function copyMapsUrl() {
-      const url = document.getElementById('export-url').value;
-      if (!url || !url.startsWith('http')) {
+      const activeUrl = activeProvider === 'google' ? googleMapsUrl : appleMapsUrl;
+      if (!activeUrl || !activeUrl.startsWith('http')) {
         showToast("No active route URL to copy");
         return;
       }
-      navigator.clipboard.writeText(url).then(() => {
-        showToast("Copied Google Maps URL to clipboard!");
+      navigator.clipboard.writeText(activeUrl).then(() => {
+        const name = activeProvider === 'google' ? 'Google Maps' : 'Apple Maps';
+        showToast(`Copied ${name} URL to clipboard!`);
       }).catch(() => {
         showToast("Failed to copy URL");
       });
     }
 
     function resetMetrics() {
+      googleMapsUrl = "";
+      appleMapsUrl = "";
       document.getElementById('metric-stops').textContent = '-';
       document.getElementById('metric-distance').textContent = '-';
       document.getElementById('metric-duration').textContent = '-';
       document.getElementById('export-url').value = 'Optimization required to generate URL';
-      document.getElementById('btn-open-maps').disabled = true;
+      document.getElementById('btn-open-google').disabled = true;
+      document.getElementById('btn-open-apple').disabled = true;
       document.getElementById('route-status').textContent = 'Ready';
     }
 
