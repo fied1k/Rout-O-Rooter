@@ -166,6 +166,53 @@ class RouteOptimizer:
 
         return f"{base_url}?{'&'.join(params)}"
 
+    def chunk_coordinates(self, coords: List[Tuple[float, float]], max_stops: int = 10) -> List[List[Tuple[float, float]]]:
+        """
+        Splits a list of coordinates into consecutive chained parts where each part has at most
+        `max_stops` locations (with the end stop of Part N being the start stop of Part N+1).
+        """
+        if len(coords) <= max_stops:
+            return [coords]
+
+        chunks = []
+        step = max_stops - 1
+        for i in range(0, len(coords) - 1, step):
+            chunk = coords[i : i + max_stops]
+            chunks.append(chunk)
+            if i + max_stops >= len(coords):
+                break
+        return chunks
+
+    def generate_segmented_urls(
+        self, coords: List[Tuple[float, float]], max_stops: int = 10
+    ) -> List[dict]:
+        """
+        Generates Google Maps and Apple Maps navigation URLs partitioned into multi-stop parts
+        (to respect Google Maps and Apple Maps ~10 waypoint limits per URL).
+        """
+        chunks = self.chunk_coordinates(coords, max_stops=max_stops)
+        segments = []
+        total_parts = len(chunks)
+
+        start_offset = 1
+        for idx, chunk in enumerate(chunks, 1):
+            g_url = self.generate_google_maps_url(chunk)
+            a_url = self.generate_apple_maps_url(chunk)
+            end_offset = start_offset + len(chunk) - 1
+            segments.append({
+                "part": idx,
+                "total_parts": total_parts,
+                "start_index": start_offset,
+                "end_index": end_offset,
+                "label": f"Part {idx} (Stops {start_offset}–{end_offset})",
+                "stops_count": len(chunk),
+                "coords": chunk,
+                "google_maps_url": g_url,
+                "apple_maps_url": a_url,
+            })
+            start_offset = end_offset
+        return segments
+
     def generate_qr(self, url: str, output_path: str = "route_qr.png") -> str:
         """Generates a QR code image from the URL."""
         img = qrcode.make(url)
@@ -230,6 +277,20 @@ class TestRouteOptimizer(unittest.TestCase):
         self.assertEqual(len(optimized), 4)
         self.assertAlmostEqual(optimized[0][0], start[0], places=2)
         self.assertAlmostEqual(optimized[-1][0], end[0], places=2)
+
+    def test_segmented_urls(self):
+        # 20 coordinates split into max 10 stops per part
+        coords = [(36.0 + i * 0.01, -95.0 - i * 0.01) for i in range(20)]
+        segments = self.ro.generate_segmented_urls(coords, max_stops=10)
+        self.assertEqual(len(segments), 3)
+        self.assertEqual(segments[0]["part"], 1)
+        self.assertEqual(segments[0]["stops_count"], 10)
+        self.assertEqual(segments[1]["part"], 2)
+        self.assertEqual(segments[1]["stops_count"], 10)
+        self.assertEqual(segments[2]["part"], 3)
+        self.assertEqual(segments[2]["stops_count"], 2)
+        self.assertIn("api=1", segments[0]["google_maps_url"])
+        self.assertIn("maps.apple.com/directions", segments[0]["apple_maps_url"])
 
 
 if __name__ == "__main__":

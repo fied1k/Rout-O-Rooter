@@ -11,6 +11,7 @@ All notable changes to this project are documented in this file.
 - Integrated unit test suite expansions for `.csv` and `.json` file ingestion validation.
 - Interactive Web GUI (`index.html`) featuring Leaflet map routing visualization, live QR code display, and drag-and-drop file ingestion.
 - Local GUI web server (`web_server.py`) with REST API bridge to `RouteOptimizer` engine.
+- Multi-part route partitioning (`chunk_coordinates` & `generate_segmented_urls`): splits routes >10 stops into chained parts (Part 1, Part 2, etc.) to comply with Google Maps & Apple Maps 10-stop link limits.
 
 ### Changed
 - Bumped project version to `v0.2.1`.

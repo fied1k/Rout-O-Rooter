@@ -68,8 +68,9 @@ class RoutORooterHandler(SimpleHTTPRequestHandler):
                     end_coord=end_coord,
                     roundtrip=roundtrip
                 )
-                maps_url = optimizer.generate_google_maps_url(optimized)
-                apple_maps_url = optimizer.generate_apple_maps_url(optimized)
+                segments = optimizer.generate_segmented_urls(optimized, max_stops=10)
+                maps_url = segments[0]["google_maps_url"] if segments else optimizer.generate_google_maps_url(optimized)
+                apple_maps_url = segments[0]["apple_maps_url"] if segments else optimizer.generate_apple_maps_url(optimized)
                 qr_path = optimizer.generate_qr(maps_url)
 
                 response_payload = {
@@ -77,6 +78,8 @@ class RoutORooterHandler(SimpleHTTPRequestHandler):
                     "optimized_coords": optimized,
                     "google_maps_url": maps_url,
                     "apple_maps_url": apple_maps_url,
+                    "segments": segments,
+                    "total_parts": len(segments),
                     "qr_path": qr_path
                 }
                 self._send_json(200, response_payload)

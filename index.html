@@ -805,6 +805,16 @@ Drop 4: 38.9282, -94.7214"></textarea>
               <button class="btn-preset" id="tab-provider-apple" onclick="setMapProvider('apple')">Apple Maps</button>
             </div>
           </div>
+
+          <!-- Multi-Part Segment Selector for >10 stops -->
+          <div id="segment-controls" style="display: none; background: #131d2e; border: 1px solid var(--border-dark); border-radius: 8px; padding: 10px; margin: 4px 0;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+              <span>🧭 <strong>Route Parts (Max 10 stops/link):</strong></span>
+              <span id="segment-summary-badge" class="badge">Part 1</span>
+            </div>
+            <div id="segment-pills" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
+          </div>
+
           <input type="text" class="export-url-input" id="export-url" readonly value="Optimization required to generate URL" />
           <div class="export-buttons">
             <button class="btn-action" id="btn-open-google" onclick="openGoogleMaps()" disabled>
@@ -814,6 +824,7 @@ Drop 4: 38.9282, -94.7214"></textarea>
               🍎 Open in Apple Maps
             </button>
             <button class="btn-preset" onclick="copyMapsUrl()">📋 Copy URL</button>
+            <button class="btn-preset" id="btn-open-all-parts" style="display: none;" onclick="openAllPartsInTabs()">📑 Open All Parts in Tabs</button>
           </div>
         </div>
         <div style="text-align: center;">
@@ -847,6 +858,8 @@ Drop 4: 38.9282, -94.7214"></textarea>
     let startCoord = null;
     let endCoord = null;
     let isRoundtrip = false;
+    let routeSegments = [];
+    let currentSegmentIndex = 0;
 
     // Presets
     const PRESETS = {
@@ -1389,13 +1402,18 @@ Drop 4: 38.9282, -94.7214"></textarea>
         document.getElementById('metric-distance').textContent = `${distanceMi} mi (${distanceKm} km)`;
         document.getElementById('metric-duration').textContent = `${durationMin} mins`;
 
-        // Generate navigation links for both Google Maps and Apple Maps
-        googleMapsUrl = buildGoogleMapsUrl(currentCoords);
-        appleMapsUrl = buildAppleMapsUrl(currentCoords);
-        updateProviderDisplay();
+        // Multi-part route segmentation (max 10 stops per navigation link)
+        routeSegments = generateSegments(currentCoords, 10);
+        currentSegmentIndex = 0;
+        renderSegmentControls();
+        selectSegment(0, false);
 
-        status.textContent = "Route optimized successfully";
-        showToast("Route optimized via OSRM TSP solver!");
+        status.textContent = routeSegments.length > 1 
+          ? `Route optimized: Split into ${routeSegments.length} parts (10 stops max per link)` 
+          : "Route optimized successfully";
+        showToast(routeSegments.length > 1 
+          ? `Route optimized and split into ${routeSegments.length} parts!` 
+          : "Route optimized via OSRM TSP solver!");
       } catch (err) {
         console.error(err);
         status.textContent = "Optimization failed";
@@ -1404,6 +1422,103 @@ Drop 4: 38.9282, -94.7214"></textarea>
         btn.disabled = false;
         btn.innerHTML = "🚀 Optimize Route (OSRM TSP Solver)";
       }
+    }
+
+    function generateSegments(coords, maxStops = 10) {
+      if (coords.length <= maxStops) {
+        return [{
+          part: 1,
+          totalParts: 1,
+          startIndex: 1,
+          endIndex: coords.length,
+          label: `Complete Route (${coords.length} stops)`,
+          coords: coords,
+          googleMapsUrl: buildGoogleMapsUrl(coords),
+          appleMapsUrl: buildAppleMapsUrl(coords)
+        }];
+      }
+
+      const chunks = [];
+      const step = maxStops - 1;
+      for (let i = 0; i < coords.length - 1; i += step) {
+        chunks.push(coords.slice(i, i + maxStops));
+        if (i + maxStops >= coords.length) break;
+      }
+
+      let startOffset = 1;
+      return chunks.map((chunk, idx) => {
+        const endOffset = startOffset + chunk.length - 1;
+        const seg = {
+          part: idx + 1,
+          totalParts: chunks.length,
+          startIndex: startOffset,
+          endIndex: endOffset,
+          label: `Part ${idx + 1} (Stops ${startOffset}–${endOffset})`,
+          coords: chunk,
+          googleMapsUrl: buildGoogleMapsUrl(chunk),
+          appleMapsUrl: buildAppleMapsUrl(chunk)
+        };
+        startOffset = endOffset;
+        return seg;
+      });
+    }
+
+    function renderSegmentControls() {
+      const container = document.getElementById('segment-controls');
+      const pillsContainer = document.getElementById('segment-pills');
+      const openAllBtn = document.getElementById('btn-open-all-parts');
+
+      if (routeSegments.length > 1) {
+        container.style.display = 'block';
+        if (openAllBtn) openAllBtn.style.display = 'inline-block';
+        document.getElementById('segment-summary-badge').textContent = `Part 1 of ${routeSegments.length}`;
+
+        pillsContainer.innerHTML = routeSegments.map((seg, idx) => `
+          <button class="btn-preset ${idx === currentSegmentIndex ? 'active' : ''}" id="pill-part-${idx}" onclick="selectSegment(${idx})">
+            ${seg.label}
+          </button>
+        `).join('');
+      } else {
+        container.style.display = 'none';
+        if (openAllBtn) openAllBtn.style.display = 'none';
+      }
+    }
+
+    function selectSegment(idx, notify = true) {
+      if (idx < 0 || idx >= routeSegments.length) return;
+      currentSegmentIndex = idx;
+
+      // Update pill active class
+      routeSegments.forEach((_, i) => {
+        const pill = document.getElementById(`pill-part-${i}`);
+        if (pill) {
+          if (i === idx) pill.classList.add('active');
+          else pill.classList.remove('active');
+        }
+      });
+
+      const seg = routeSegments[idx];
+      document.getElementById('segment-summary-badge').textContent = `Part ${seg.part} of ${seg.totalParts}`;
+      googleMapsUrl = seg.googleMapsUrl;
+      appleMapsUrl = seg.appleMapsUrl;
+      updateProviderDisplay();
+
+      if (notify) {
+        showToast(`Selected ${seg.label}`);
+      }
+    }
+
+    function openAllPartsInTabs() {
+      if (!routeSegments.length) return;
+      const isGoogle = activeProvider === 'google';
+      const providerName = isGoogle ? 'Google Maps' : 'Apple Maps';
+      showToast(`Opening all ${routeSegments.length} parts in ${providerName} tabs...`);
+      routeSegments.forEach((seg, i) => {
+        const url = isGoogle ? seg.googleMapsUrl : seg.appleMapsUrl;
+        setTimeout(() => {
+          window.open(url, '_blank');
+        }, i * 300);
+      });
     }
 
     function buildGoogleMapsUrl(coords) {
@@ -1449,18 +1564,19 @@ Drop 4: 38.9282, -94.7214"></textarea>
       const btnOpenGoogle = document.getElementById('btn-open-google');
       const btnOpenApple = document.getElementById('btn-open-apple');
       const qrLabel = document.getElementById('qr-label');
+      const partSuffix = routeSegments.length > 1 ? ` (Part ${currentSegmentIndex + 1})` : '';
 
       if (activeProvider === 'google') {
         googleBtn.classList.add('active');
         appleBtn.classList.remove('active');
         urlInput.value = googleMapsUrl || "Optimization required to generate URL";
-        if (qrLabel) qrLabel.textContent = "Scan for Google Maps";
+        if (qrLabel) qrLabel.textContent = `Scan for Google Maps${partSuffix}`;
         if (googleMapsUrl) updateQRCode(googleMapsUrl);
       } else {
         appleBtn.classList.add('active');
         googleBtn.classList.remove('active');
         urlInput.value = appleMapsUrl || "Optimization required to generate URL";
-        if (qrLabel) qrLabel.textContent = "Scan for Apple Maps";
+        if (qrLabel) qrLabel.textContent = `Scan for Apple Maps${partSuffix}`;
         if (appleMapsUrl) updateQRCode(appleMapsUrl);
       }
 
@@ -1504,7 +1620,8 @@ Drop 4: 38.9282, -94.7214"></textarea>
       }
       navigator.clipboard.writeText(activeUrl).then(() => {
         const name = activeProvider === 'google' ? 'Google Maps' : 'Apple Maps';
-        showToast(`Copied ${name} URL to clipboard!`);
+        const partText = routeSegments.length > 1 ? ` (Part ${currentSegmentIndex + 1})` : '';
+        showToast(`Copied ${name}${partText} URL to clipboard!`);
       }).catch(() => {
         showToast("Failed to copy URL");
       });
@@ -1513,6 +1630,9 @@ Drop 4: 38.9282, -94.7214"></textarea>
     function resetMetrics() {
       googleMapsUrl = "";
       appleMapsUrl = "";
+      routeSegments = [];
+      currentSegmentIndex = 0;
+      renderSegmentControls();
       document.getElementById('metric-stops').textContent = '-';
       document.getElementById('metric-distance').textContent = '-';
       document.getElementById('metric-duration').textContent = '-';

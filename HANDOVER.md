@@ -34,6 +34,7 @@
    * **`optimize_route(coords, start_coord=None, end_coord=None, roundtrip=False)`**: Zero-cost TSP solver communicating with Open Source Routing Machine (`http://router.project-osrm.org/trip/v1/driving/`), supporting optional fixed origin, fixed destination, and roundtrips.
    * **`generate_google_maps_url(coords)`**: Constructs standard multi-stop navigation URLs with origin, destination, and intermediate waypoints.
    * **`generate_apple_maps_url(coords)`**: Constructs native Apple Maps multi-stop navigation URLs using the unified `/directions` multi-waypoint scheme.
+   * **`generate_segmented_urls(coords, max_stops=10)`**: Splits long routes into chained navigation parts (Part 1, Part 2, etc.) to comply with Google & Apple Maps limits.
    * **`generate_qr(url, output_path)`**: Builds local PNG QR code files for handoff to mobile devices.
    * **`TestRouteOptimizer`**: Self-testing harness covering regex extraction, CSV ingestion, JSON parsing, and routing URL generation.
 
