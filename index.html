@@ -597,9 +597,10 @@
     }
 
     .qr-box canvas, .qr-box img {
-      width: 168px !important;
-      height: 168px !important;
-      display: block !important;
+      width: 168px;
+      height: 168px;
+      max-width: 100%;
+      max-height: 100%;
       image-rendering: pixelated;
       image-rendering: -moz-crisp-edges;
       image-rendering: crisp-edges;
@@ -676,9 +677,10 @@
     }
 
     .qr-modal-box canvas, .qr-modal-box img {
-      width: 280px !important;
-      height: 280px !important;
-      display: block !important;
+      width: 280px;
+      height: 280px;
+      max-width: 100%;
+      max-height: 100%;
       image-rendering: pixelated;
       image-rendering: -moz-crisp-edges;
       image-rendering: crisp-edges;
@@ -1619,13 +1621,13 @@ Drop 4: 38.9282, -94.7214"></textarea>
         appleBtn.classList.remove('active');
         urlInput.value = googleMapsUrl || "Optimization required to generate URL";
         if (qrLabel) qrLabel.textContent = `Scan for Google Maps${partSuffix}`;
-        if (googleMapsUrl) updateQRCode(googleMapsUrl);
+        updateQRCode(googleMapsUrl);
       } else {
         appleBtn.classList.add('active');
         googleBtn.classList.remove('active');
         urlInput.value = appleMapsUrl || "Optimization required to generate URL";
         if (qrLabel) qrLabel.textContent = `Scan for Apple Maps${partSuffix}`;
-        if (appleMapsUrl) updateQRCode(appleMapsUrl);
+        updateQRCode(appleMapsUrl);
       }
 
       if (googleMapsUrl) {
@@ -1637,63 +1639,63 @@ Drop 4: 38.9282, -94.7214"></textarea>
       }
     }
 
-    function updateQRCode(url) {
-      const qrEl = document.getElementById("qrcode");
-      if (!qrEl) return;
-      qrEl.innerHTML = "";
-      const targetUrl = url || "https://maps.google.com";
+    function renderSingleQR(containerId, text, displaySize, renderResolution) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      el.innerHTML = "";
+      const targetUrl = text || "https://maps.google.com";
 
       if (backendOnline) {
         // High-resolution ISO/IEC 18004 compliant PNG generated with Python qrcode (quiet zone border=4)
         const img = document.createElement("img");
         img.src = `/api/qr?url=${encodeURIComponent(targetUrl)}&t=${Date.now()}`;
         img.alt = "Navigation QR Code";
-        img.style.width = "168px";
-        img.style.height = "168px";
+        img.style.width = `${displaySize}px`;
+        img.style.height = `${displaySize}px`;
         img.style.display = "block";
         img.style.imageRendering = "pixelated";
-        qrEl.appendChild(img);
+        el.appendChild(img);
       } else {
-        // High-resolution client-side rendering with CorrectLevel.L (7%)
-        // Level L provides maximum module size & optical clarity on screen scans
-        qrCodeInstance = new QRCode(qrEl, {
+        // Render in isolated off-DOM temporary element so QRCode.js cannot inject dual elements into the page
+        const temp = document.createElement("div");
+        new QRCode(temp, {
           text: targetUrl,
-          width: 336,
-          height: 336,
+          width: renderResolution,
+          height: renderResolution,
           colorDark: "#000000",
           colorLight: "#ffffff",
           correctLevel: QRCode.CorrectLevel.L
         });
-      }
 
-      updateModalQR(targetUrl);
+        // Extract ONLY the canvas (or img fallback) ensuring exactly ONE element in DOM
+        const canvas = temp.querySelector("canvas");
+        if (canvas) {
+          canvas.style.width = `${displaySize}px`;
+          canvas.style.height = `${displaySize}px`;
+          canvas.style.display = "block";
+          canvas.style.imageRendering = "pixelated";
+          el.appendChild(canvas);
+        } else {
+          const img = temp.querySelector("img");
+          if (img) {
+            img.style.width = `${displaySize}px`;
+            img.style.height = `${displaySize}px`;
+            img.style.display = "block";
+            el.appendChild(img);
+          }
+        }
+      }
+    }
+
+    function updateQRCode(url) {
+      const activeUrl = url || (activeProvider === 'google' ? googleMapsUrl : appleMapsUrl) || "https://maps.google.com";
+      renderSingleQR("qrcode", activeUrl, 168, 336);
+      updateModalQR(activeUrl);
     }
 
     function updateModalQR(url) {
-      const modalEl = document.getElementById("modal-qrcode");
-      if (!modalEl) return;
-      modalEl.innerHTML = "";
-      const targetUrl = url || "https://maps.google.com";
-
-      if (backendOnline) {
-        const img = document.createElement("img");
-        img.src = `/api/qr?url=${encodeURIComponent(targetUrl)}&t=${Date.now()}`;
-        img.alt = "Large Navigation QR Code";
-        img.style.width = "280px";
-        img.style.height = "280px";
-        img.style.display = "block";
-        img.style.imageRendering = "pixelated";
-        modalEl.appendChild(img);
-      } else {
-        new QRCode(modalEl, {
-          text: targetUrl,
-          width: 560,
-          height: 560,
-          colorDark: "#000000",
-          colorLight: "#ffffff",
-          correctLevel: QRCode.CorrectLevel.L
-        });
-      }
+      const activeUrl = url || (activeProvider === 'google' ? googleMapsUrl : appleMapsUrl) || "https://maps.google.com";
+      renderSingleQR("modal-qrcode", activeUrl, 280, 560);
     }
 
     function openQrModal() {
@@ -1739,10 +1741,10 @@ Drop 4: 38.9282, -94.7214"></textarea>
       const img = qrEl.querySelector("img");
       const canvas = qrEl.querySelector("canvas");
       let dataUrl = "";
-      if (img && img.src && img.src.startsWith("data:image")) {
-        dataUrl = img.src;
-      } else if (canvas) {
+      if (canvas) {
         dataUrl = canvas.toDataURL("image/png");
+      } else if (img && img.src && img.src.startsWith("data:image")) {
+        dataUrl = img.src;
       }
 
       if (!dataUrl) {
