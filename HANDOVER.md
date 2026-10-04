@@ -1,6 +1,6 @@
-# Project Handover Document: Rout-o-Rooter
+# Project Handover Document: Rout-O-Rooter
 
-**Repository:** `https://github.com/fied1k/rout-o-rooter`  
+**Repository:** `https://github.com/fied1k/Rout-O-Rooter`  
 **Current Release:** `v0.2.1`  
 **Architecture Model:** Zero-Cost Open Source Route Optimizer  
 **Handover Date:** October 2026  
@@ -9,7 +9,7 @@
 
 ## 1. Executive Summary & Objective
 
-`rout-o-rooter` is a zero-cost ($0 budget), automated pipeline designed to ingest geographic coordinates across untraditional and multi-modal channels (plain text, IMAP email bodies, image OCR, `.csv`, `.json`, and raw `.txt` files), solve the Traveling Salesperson Problem (TSP) using public routing engines, and generate actionable outputs: universal multi-stop Google Maps navigation links and mobile-ready QR codes.
+`Rout-O-Rooter` is a zero-cost ($0 budget), automated pipeline designed to ingest geographic coordinates across untraditional and multi-modal channels (plain text, IMAP email bodies, image OCR, `.csv`, `.json`, and raw `.txt` files), solve the Traveling Salesperson Problem (TSP) using public routing engines, and generate actionable outputs: universal multi-stop Google Maps navigation links and mobile-ready QR codes.
 
 ---
 

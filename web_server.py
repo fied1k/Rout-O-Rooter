@@ -1,5 +1,5 @@
 """
-Rout-o-Rooter Local Web Server & GUI Runner
+Rout-O-Rooter Local Web Server & GUI Runner
 Serves the web application and connects the frontend interface to the RouteOptimizer core engine.
 """
 import os
@@ -171,7 +171,7 @@ def run(port=PORT, open_browser=True):
     httpd = HTTPServer(server_address, RoutORooterHandler)
     url = f"http://localhost:{port}"
     print(f"==================================================")
-    print(f"  Rout-o-Rooter Web GUI Server v{__version__}")
+    print(f"  Rout-O-Rooter Web GUI Server v{__version__}")
     print(f"  Serving at: {url}")
     print(f"  Press Ctrl+C to stop the server.")
     print(f"==================================================")

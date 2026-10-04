@@ -1,4 +1,4 @@
-# Rout-o-Rooter (v0.2.1)
+# Rout-O-Rooter (v0.2.1)
 
 A zero-cost route optimization pipeline that ingests raw coordinate data via text, direct file uploads (.csv, .json, .txt), email (IMAP), or image OCR, solves the Traveling Salesperson Problem (TSP) using OSRM, and outputs ready-to-use Google Maps URLs and QR codes.
 
