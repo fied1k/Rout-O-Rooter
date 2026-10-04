@@ -761,9 +761,12 @@ Drop 4: 38.9282, -94.7214"></textarea>
         attributionControl: false
       }).setView([39.0997, -94.5786], 11);
 
-      // Dark theme map tiles
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19
+      // Dark theme map tiles with authenticated CARTO API key
+      const CARTO_KEY = "cb1_3ywj_1_2d74e9d8280d9bc5291f186b";
+      L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png?key=${CARTO_KEY}`, {
+        subdomains: "abcd",
+        maxZoom: 20,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank">CARTO</a>'
       }).addTo(map);
 
       markersLayer = L.layerGroup().addTo(map);
