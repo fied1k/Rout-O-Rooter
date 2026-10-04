@@ -129,17 +129,20 @@ class RouteOptimizer:
         return f"{base_url}&{urllib.parse.urlencode(params)}"
 
     def generate_apple_maps_url(self, coords: List[Tuple[float, float]]) -> str:
-        """Builds a clickable Apple Maps multi-stop navigation URL."""
+        """Builds a clickable Apple Maps multi-stop navigation URL using the unified Maps URL scheme."""
         if len(coords) < 2:
             raise ValueError("Requires at least 2 coordinates.")
 
-        saddr = f"{coords[0][0]},{coords[0][1]}"
-        if len(coords) == 2:
-            daddr = f"{coords[1][0]},{coords[1][1]}"
-        else:
-            daddr = "+to:".join([f"{lat},{lon}" for lat, lon in coords[1:]])
+        source = f"{coords[0][0]},{coords[0][1]}"
+        destination = f"{coords[-1][0]},{coords[-1][1]}"
+        base_url = "https://maps.apple.com/directions"
 
-        return f"https://maps.apple.com/?saddr={saddr}&daddr={daddr}&dirflg=d"
+        params = [f"source={source}", f"destination={destination}"]
+        for lat, lon in coords[1:-1]:
+            params.append(f"waypoint={lat},{lon}")
+        params.append("mode=driving")
+
+        return f"{base_url}?{'&'.join(params)}"
 
     def generate_qr(self, url: str, output_path: str = "route_qr.png") -> str:
         """Generates a QR code image from the URL."""
@@ -193,9 +196,9 @@ class TestRouteOptimizer(unittest.TestCase):
         self.assertIn("api=1", url)
         self.assertIn("origin=", url)
         apple_url = self.ro.generate_apple_maps_url(optimized)
-        self.assertIn("maps.apple.com", apple_url)
-        self.assertIn("saddr=", apple_url)
-        self.assertIn("daddr=", apple_url)
+        self.assertIn("maps.apple.com/directions", apple_url)
+        self.assertIn("source=", apple_url)
+        self.assertIn("destination=", apple_url)
 
 
 if __name__ == "__main__":

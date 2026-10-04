@@ -767,7 +767,7 @@ Drop 4: 38.9282, -94.7214"></textarea>
       initQR();
       setupDropzone();
       checkBackend();
-      loadPreset('kc');
+      renderStopsList();
     });
 
     function checkBackend() {
@@ -792,7 +792,7 @@ Drop 4: 38.9282, -94.7214"></textarea>
       map = L.map('map', {
         zoomControl: true,
         attributionControl: false
-      }).setView([39.0997, -94.5786], 11);
+      }).setView([38.5, -96.0], 4);
 
       // Dark theme map tiles with authenticated CARTO API key
       const CARTO_KEY = "cb1_3ywj_1_2d74e9d8280d9bc5291f186b";
@@ -1155,14 +1155,16 @@ Drop 4: 38.9282, -94.7214"></textarea>
 
     function buildAppleMapsUrl(coords) {
       if (coords.length < 2) return "";
-      const saddr = `${coords[0][0]},${coords[0][1]}`;
-      let daddr = "";
-      if (coords.length === 2) {
-        daddr = `${coords[1][0]},${coords[1][1]}`;
-      } else {
-        daddr = coords.slice(1).map(c => `${c[0]},${c[1]}`).join('+to:');
-      }
-      return `https://maps.apple.com/?saddr=${saddr}&daddr=${daddr}&dirflg=d`;
+      const source = `${coords[0][0]},${coords[0][1]}`;
+      const destination = `${coords[coords.length - 1][0]},${coords[coords.length - 1][1]}`;
+      const base = "https://maps.apple.com/directions";
+
+      const parts = [`source=${source}`, `destination=${destination}`];
+      coords.slice(1, -1).forEach(c => {
+        parts.push(`waypoint=${c[0]},${c[1]}`);
+      });
+      parts.push("mode=driving");
+      return `${base}?${parts.join('&')}`;
     }
 
     function setMapProvider(provider) {
