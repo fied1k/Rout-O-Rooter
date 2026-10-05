@@ -360,12 +360,69 @@
       padding: 8px 12px;
       font-size: 0.82rem;
       font-family: monospace;
+      user-select: none;
+      transition: background-color 0.15s, border-color 0.15s, transform 0.1s;
+    }
+
+    .stop-card:hover {
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+
+    .stop-card.dragging {
+      opacity: 0.35;
+      border-color: var(--primary);
+      background-color: #1e293b;
+    }
+
+    .stop-card.drag-over {
+      border-color: var(--primary);
+      background-color: #132238;
+      transform: translateY(-2px);
+    }
+
+    .drag-handle {
+      color: var(--text-muted);
+      cursor: grab;
+      font-size: 1rem;
+      margin-right: 2px;
+      padding: 0 4px;
+      line-height: 1;
+      opacity: 0.6;
+      transition: opacity 0.15s;
+    }
+
+    .drag-handle:hover {
+      opacity: 1;
+      color: var(--primary);
+    }
+
+    .btn-icon-move {
+      background-color: var(--card-dark);
+      border: 1px solid var(--border-dark);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.68rem;
+      padding: 3px 6px;
+      border-radius: 4px;
+      line-height: 1;
+      transition: all 0.15s;
+    }
+
+    .btn-icon-move:hover:not(:disabled) {
+      color: var(--primary);
+      border-color: var(--primary);
+      background-color: rgba(56, 189, 248, 0.1);
+    }
+
+    .btn-icon-move:disabled {
+      opacity: 0.25;
+      cursor: not-allowed;
     }
 
     .stop-left {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
     }
 
     .stop-idx {
@@ -793,13 +850,16 @@ Drop 4: 38.9282, -94.7214"></textarea>
         <div class="panel-title">
           <span>📍 Staged Waypoints (<span id="stop-count">0</span>)</span>
         </div>
-        <button class="btn-action btn-danger" onclick="clearStops()">Clear All</button>
+        <div style="display: flex; gap: 6px;">
+          <button class="btn-preset" onclick="reverseStopOrder()" title="Reverse Waypoint Order">🔄 Reverse</button>
+          <button class="btn-action btn-danger" onclick="clearStops()">Clear All</button>
+        </div>
       </div>
 
       <!-- Staged Stops List -->
       <div class="stops-container" id="stops-list">
         <div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 24px 0;">
-          No waypoints staged yet. Ingest raw text or load a sample above.
+          No waypoints staged yet. Ingest raw text or paste coordinates above.
         </div>
       </div>
 
@@ -837,10 +897,15 @@ Drop 4: 38.9282, -94.7214"></textarea>
         </div>
       </div>
 
-      <!-- Optimize Action -->
-      <button class="btn-action btn-accent" id="btn-optimize" onclick="optimizeCurrentRoute()" style="margin-top: 6px; padding: 14px;">
-        🚀 Optimize Route (OSRM TSP Solver)
-      </button>
+      <!-- Route Submission Buttons -->
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
+        <button class="btn-action btn-accent" id="btn-optimize" onclick="optimizeCurrentRoute()" style="padding: 12px;">
+          🚀 Optimize Route (OSRM TSP Solver)
+        </button>
+        <button class="btn-action" id="btn-submit-order" onclick="submitCurrentOrder()" style="background-color: #2563eb; color: #ffffff; padding: 11px;" title="Build navigation route in this exact manual sequence without TSP reordering">
+          🧭 Submit Route (In Current Order)
+        </button>
+      </div>
     </div>
 
     <!-- Right Map & Output Presentation Panel -->
@@ -1192,23 +1257,90 @@ Drop 4: 38.9282, -94.7214"></textarea>
       }
     }
 
+    let draggedIndex = null;
+
+    function handleDragStart(e, index) {
+      draggedIndex = index;
+      e.dataTransfer.effectAllowed = 'move';
+      e.target.classList.add('dragging');
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const card = e.currentTarget;
+      card.classList.add('drag-over');
+    }
+
+    function handleDragLeave(e) {
+      e.currentTarget.classList.remove('drag-over');
+    }
+
+    function handleDrop(e, targetIndex) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('drag-over');
+      if (draggedIndex === null || draggedIndex === targetIndex) return;
+
+      const item = currentCoords.splice(draggedIndex, 1)[0];
+      currentCoords.splice(targetIndex, 0, item);
+      draggedIndex = null;
+
+      renderStopsList();
+      updateMapMarkers();
+      showToast(`Moved waypoint to position ${targetIndex + 1}`);
+    }
+
+    function handleDragEnd(e) {
+      e.target.classList.remove('dragging');
+      document.querySelectorAll('.stop-card').forEach(c => c.classList.remove('drag-over'));
+      draggedIndex = null;
+    }
+
+    function moveStop(index, direction) {
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= currentCoords.length) return;
+
+      const item = currentCoords.splice(index, 1)[0];
+      currentCoords.splice(targetIndex, 0, item);
+
+      renderStopsList();
+      updateMapMarkers();
+      showToast(`Moved waypoint to position ${targetIndex + 1}`);
+    }
+
+    function reverseStopOrder() {
+      if (currentCoords.length < 2) {
+        showToast("Need at least 2 stops to reverse order");
+        return;
+      }
+      currentCoords.reverse();
+      renderStopsList();
+      updateMapMarkers();
+      showToast("Reversed order of all waypoints");
+    }
+
     // Render Staged Stops List
     function renderStopsList() {
       const container = document.getElementById('stops-list');
       document.getElementById('stop-count').textContent = currentCoords.length;
 
       if (!currentCoords.length) {
-        container.innerHTML = `<div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 24px 0;">No waypoints staged yet.</div>`;
+        container.innerHTML = `<div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 24px 0;">No waypoints staged yet. Ingest raw text or paste coordinates above.</div>`;
         return;
       }
 
       container.innerHTML = currentCoords.map((c, i) => `
-        <div class="stop-card">
+        <div class="stop-card" draggable="true" ondragstart="handleDragStart(event, ${i})" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, ${i})" ondragend="handleDragEnd(event)">
           <div class="stop-left">
+            <span class="drag-handle" title="Drag to rearrange waypoint order">⋮⋮</span>
             <span class="stop-idx">${i + 1}</span>
             <span>${c[0].toFixed(5)}, ${c[1].toFixed(5)}</span>
           </div>
-          <button class="btn-icon-del" onclick="deleteStop(${i})" title="Remove Stop">✕</button>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <button class="btn-icon-move" onclick="moveStop(${i}, -1)" ${i === 0 ? 'disabled' : ''} title="Move Up">▲</button>
+            <button class="btn-icon-move" onclick="moveStop(${i}, 1)" ${i === currentCoords.length - 1 ? 'disabled' : ''} title="Move Down">▼</button>
+            <button class="btn-icon-del" onclick="deleteStop(${i})" title="Remove Stop">✕</button>
+          </div>
         </div>
       `).join('');
     }
@@ -1378,8 +1510,16 @@ Drop 4: 38.9282, -94.7214"></textarea>
       }
     }
 
-    // TSP Route Optimization via OSRM Trip API
-    async function optimizeCurrentRoute() {
+    function optimizeCurrentRoute() {
+      runOptimization(true);
+    }
+
+    function submitCurrentOrder() {
+      runOptimization(false);
+    }
+
+    // Route calculation supporting both TSP solver and exact sequential routing
+    async function runOptimization(shouldOptimize = true) {
       // Assemble full waypoint payload: start point + intermediate stops + end point
       const points = [];
       if (startCoord) {
@@ -1395,47 +1535,85 @@ Drop 4: 38.9282, -94.7214"></textarea>
       }
 
       if (points.length < 2) {
-        showToast("Please provide at least 2 total stops or endpoints to optimize");
+        showToast("Please provide at least 2 total stops or endpoints to route");
         return;
       }
 
-      const btn = document.getElementById('btn-optimize');
+      const btnOpt = document.getElementById('btn-optimize');
+      const btnSub = document.getElementById('btn-submit-order');
       const status = document.getElementById('route-status');
-      btn.disabled = true;
-      btn.innerHTML = "⏳ Computing TSP Route...";
-      status.textContent = "Querying OSRM Trip API...";
+
+      btnOpt.disabled = true;
+      if (btnSub) btnSub.disabled = true;
+
+      if (shouldOptimize) {
+        btnOpt.innerHTML = "⏳ Computing TSP Route...";
+        status.textContent = "Solving optimal TSP route...";
+      } else {
+        if (btnSub) btnSub.innerHTML = "⏳ Building Sequential Route...";
+        status.textContent = "Routing waypoints in current sequence...";
+      }
 
       try {
-        const destParam = (endCoord || isRoundtrip) ? "last" : "any";
-        const roundtripParam = isRoundtrip ? "true" : "false";
-        const coordString = points.map(c => `${c[1]},${c[0]}`).join(';');
-        const url = `https://router.project-osrm.org/trip/v1/driving/${coordString}?roundtrip=${roundtripParam}&source=first&destination=${destParam}&overview=full&geometries=geojson`;
+        let routeCoords = [];
+        let geometryCoords = [];
+        let totalDistance = 0;
+        let totalDuration = 0;
 
-        const response = await fetch(url);
-        if (!response.ok) throw new Error("OSRM routing server responded with error");
+        if (shouldOptimize) {
+          // TSP Optimization via OSRM Trip API
+          const destParam = (endCoord || isRoundtrip) ? "last" : "any";
+          const roundtripParam = isRoundtrip ? "true" : "false";
+          const coordString = points.map(c => `${c[1]},${c[0]}`).join(';');
+          const url = `https://router.project-osrm.org/trip/v1/driving/${coordString}?roundtrip=${roundtripParam}&source=first&destination=${destParam}&overview=full&geometries=geojson`;
 
-        const data = await response.json();
-        if (data.code !== "Ok" || !data.trips || !data.trips.length) {
-          throw new Error("Route optimization returned no viable solution");
+          const response = await fetch(url);
+          if (!response.ok) throw new Error("OSRM routing server responded with error");
+          const data = await response.json();
+          if (data.code !== "Ok" || !data.trips || !data.trips.length) {
+            throw new Error("Route optimization returned no viable solution");
+          }
+
+          const trip = data.trips[0];
+          const waypoints = data.waypoints;
+          waypoints.sort((a, b) => a.waypoint_index - b.waypoint_index);
+          routeCoords = waypoints.map(wp => [wp.location[1], wp.location[0]]);
+          if (trip.geometry && trip.geometry.coordinates) {
+            geometryCoords = trip.geometry.coordinates.map(c => [c[1], c[0]]);
+          }
+          totalDistance = trip.distance;
+          totalDuration = trip.duration;
+
+          currentCoords = routeCoords;
+          renderStopsList();
+          updateMapMarkers();
+        } else {
+          // Exact-sequence route via OSRM Route API
+          const seqPoints = isRoundtrip ? [...points, points[0]] : [...points];
+          const coordString = seqPoints.map(c => `${c[1]},${c[0]}`).join(';');
+          const url = `https://router.project-osrm.org/route/v1/driving/${coordString}?overview=full&geometries=geojson`;
+
+          const response = await fetch(url);
+          if (!response.ok) throw new Error("OSRM routing server responded with error");
+          const data = await response.json();
+          if (data.code !== "Ok" || !data.routes || !data.routes.length) {
+            throw new Error("Sequential routing returned no viable path");
+          }
+
+          const route = data.routes[0];
+          routeCoords = seqPoints;
+          if (route.geometry && route.geometry.coordinates) {
+            geometryCoords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+          }
+          totalDistance = route.distance;
+          totalDuration = route.duration;
         }
 
-        const trip = data.trips[0];
-        const waypoints = data.waypoints;
-
-        waypoints.sort((a, b) => a.waypoint_index - b.waypoint_index);
-        const optimizedCoords = waypoints.map(wp => [wp.location[1], wp.location[0]]);
-
-        // Update state
-        currentCoords = optimizedCoords;
-        renderStopsList();
-        updateMapMarkers();
-
         // Draw driving geometry polyline
-        if (trip.geometry && trip.geometry.coordinates) {
-          const latLngs = trip.geometry.coordinates.map(c => [c[1], c[0]]);
+        if (geometryCoords.length) {
           routeLayer.clearLayers();
-          const polyline = L.polyline(latLngs, {
-            color: '#10b981',
+          const polyline = L.polyline(geometryCoords, {
+            color: shouldOptimize ? '#10b981' : '#3b82f6',
             weight: 5,
             opacity: 0.9,
             dashArray: null
@@ -1444,33 +1622,38 @@ Drop 4: 38.9282, -94.7214"></textarea>
         }
 
         // Metrics
-        const distanceKm = (trip.distance / 1000).toFixed(1);
-        const distanceMi = (trip.distance / 1609.34).toFixed(1);
-        const durationMin = Math.round(trip.duration / 60);
+        const distanceKm = (totalDistance / 1000).toFixed(1);
+        const distanceMi = (totalDistance / 1609.34).toFixed(1);
+        const durationMin = Math.round(totalDuration / 60);
 
-        document.getElementById('metric-stops').textContent = currentCoords.length;
+        document.getElementById('metric-stops').textContent = routeCoords.length;
         document.getElementById('metric-distance').textContent = `${distanceMi} mi (${distanceKm} km)`;
         document.getElementById('metric-duration').textContent = `${durationMin} mins`;
 
         // Multi-part route segmentation (max 10 stops per navigation link)
-        routeSegments = generateSegments(currentCoords, 10);
+        routeSegments = generateSegments(routeCoords, 10);
         currentSegmentIndex = 0;
         renderSegmentControls();
         selectSegment(0, false);
 
-        status.textContent = routeSegments.length > 1 
-          ? `Route optimized: Split into ${routeSegments.length} parts (10 stops max per link)` 
-          : "Route optimized successfully";
-        showToast(routeSegments.length > 1 
-          ? `Route optimized and split into ${routeSegments.length} parts!` 
-          : "Route optimized via OSRM TSP solver!");
+        const routeTypeDesc = shouldOptimize ? "Optimized TSP" : "Custom sequence";
+        status.textContent = routeSegments.length > 1
+          ? `${routeTypeDesc}: Split into ${routeSegments.length} parts (10 stops max per link)`
+          : `${routeTypeDesc} generated successfully`;
+        showToast(routeSegments.length > 1
+          ? `Route generated and split into ${routeSegments.length} parts!`
+          : `Route built in ${shouldOptimize ? 'optimized TSP' : 'current custom'} order!`);
       } catch (err) {
         console.error(err);
-        status.textContent = "Optimization failed";
-        showToast("Optimization error: " + err.message);
+        status.textContent = "Routing failed";
+        showToast("Routing error: " + err.message);
       } finally {
-        btn.disabled = false;
-        btn.innerHTML = "🚀 Optimize Route (OSRM TSP Solver)";
+        btnOpt.disabled = false;
+        btnOpt.innerHTML = "🚀 Optimize Route (OSRM TSP Solver)";
+        if (btnSub) {
+          btnSub.disabled = false;
+          btnSub.innerHTML = "🧭 Submit Route (In Current Order)";
+        }
       }
     }
 
@@ -1639,14 +1822,54 @@ Drop 4: 38.9282, -94.7214"></textarea>
       }
     }
 
+    function renderClientQR(el, targetUrl, displaySize, renderResolution) {
+      const temp = document.createElement("div");
+      new QRCode(temp, {
+        text: targetUrl,
+        width: renderResolution,
+        height: renderResolution,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.L
+      });
+
+      const srcCanvas = temp.querySelector("canvas");
+      if (srcCanvas) {
+        // Clone into our own detached canvas so QRCode.js's internal async timer cannot hide it
+        const cleanCanvas = document.createElement("canvas");
+        cleanCanvas.width = srcCanvas.width;
+        cleanCanvas.height = srcCanvas.height;
+        const ctx = cleanCanvas.getContext("2d");
+        ctx.drawImage(srcCanvas, 0, 0);
+
+        cleanCanvas.style.width = `${displaySize}px`;
+        cleanCanvas.style.height = `${displaySize}px`;
+        cleanCanvas.style.display = "block";
+        cleanCanvas.style.imageRendering = "pixelated";
+        el.innerHTML = "";
+        el.appendChild(cleanCanvas);
+        return;
+      }
+
+      const img = temp.querySelector("img");
+      if (img && img.src) {
+        const cleanImg = document.createElement("img");
+        cleanImg.src = img.src;
+        cleanImg.style.width = `${displaySize}px`;
+        cleanImg.style.height = `${displaySize}px`;
+        cleanImg.style.display = "block";
+        cleanImg.style.imageRendering = "pixelated";
+        el.innerHTML = "";
+        el.appendChild(cleanImg);
+      }
+    }
+
     function renderSingleQR(containerId, text, displaySize, renderResolution) {
       const el = document.getElementById(containerId);
       if (!el) return;
-      el.innerHTML = "";
       const targetUrl = text || "https://maps.google.com";
 
       if (backendOnline) {
-        // High-resolution ISO/IEC 18004 compliant PNG generated with Python qrcode (quiet zone border=4)
         const img = document.createElement("img");
         img.src = `/api/qr?url=${encodeURIComponent(targetUrl)}&t=${Date.now()}`;
         img.alt = "Navigation QR Code";
@@ -1654,36 +1877,13 @@ Drop 4: 38.9282, -94.7214"></textarea>
         img.style.height = `${displaySize}px`;
         img.style.display = "block";
         img.style.imageRendering = "pixelated";
+        img.onerror = () => {
+          renderClientQR(el, targetUrl, displaySize, renderResolution);
+        };
+        el.innerHTML = "";
         el.appendChild(img);
       } else {
-        // Render in isolated off-DOM temporary element so QRCode.js cannot inject dual elements into the page
-        const temp = document.createElement("div");
-        new QRCode(temp, {
-          text: targetUrl,
-          width: renderResolution,
-          height: renderResolution,
-          colorDark: "#000000",
-          colorLight: "#ffffff",
-          correctLevel: QRCode.CorrectLevel.L
-        });
-
-        // Extract ONLY the canvas (or img fallback) ensuring exactly ONE element in DOM
-        const canvas = temp.querySelector("canvas");
-        if (canvas) {
-          canvas.style.width = `${displaySize}px`;
-          canvas.style.height = `${displaySize}px`;
-          canvas.style.display = "block";
-          canvas.style.imageRendering = "pixelated";
-          el.appendChild(canvas);
-        } else {
-          const img = temp.querySelector("img");
-          if (img) {
-            img.style.width = `${displaySize}px`;
-            img.style.height = `${displaySize}px`;
-            img.style.display = "block";
-            el.appendChild(img);
-          }
-        }
+        renderClientQR(el, targetUrl, displaySize, renderResolution);
       }
     }
 
