@@ -87,61 +87,7 @@ class RouteOptimizer:
             line = re.sub(r"(\d{2})-(\d{4})", r"\1.\2", line)
             line = re.sub(r"(?<=[,\s])(\d{1,3})-(\d{2,8})", r"\1.\2", line)
 
-            # Line 1: e.g. 38.1234, -44.2345 -> -94.2345 (4 read as 9) or 32.1234/32.234 -> 38.1234
-            line = re.sub(r"\b38\.1234[,\s]+-44\.", "38.1234, -94.", line)
-            line = re.sub(r"\b32\.[12]234[,\s]+-44\.", "38.1234, -94.", line)
-            line = re.sub(r"\b32\.[12]234[,\s]+-94\.", "38.1234, -94.", line)
 
-            # Line 2: e.g. -44.7840 -> -94.7890
-            line = re.sub(r"\b39\.5678[,\s]+-44\.", "39.5678, -94.", line)
-            line = re.sub(r"7840\b", "7890", line)
-
-            # Line 3: e.g. 6784 -> 6789
-            line = re.sub(r"6784\b", "6789", line)
-
-            # Line 7: e.g. |.4433 or 1.4433 or Y.4433 -> 41.4433
-            line = re.sub(r"^[|\[\]1I!\s]*\.\s*4433", "41.4433", line)
-            line = re.sub(r"\b1\.4433[,\s]+-87\.", "41.4433, -87.", line)
-            line = re.sub(r"\b[A4][Ll1][Yy4]?\s*[Yy4]?433", "41.4433", line)
-
-            # Line 9: '43.9911' -> '48.9911'
-            line = re.sub(r"\b43\.9911", "48.9911", line)
-
-            # Correct handwriting OCR confusion on 4, 8, 9, 5, 1
-            # E.g. line 9: 'E.G} 2.8822' or 'U2.9911' or '48.9911'
-            line = re.sub(r"^[EeFfUu]\.[Gg9][\w}]*\s+", "48.9911, ", line)
-            line = re.sub(r"\b[uU][258zZSs]\b", "48", line)
-            line = re.sub(r"\b[uU][258zZSs]\.", "48.", line)
-            line = re.sub(r"\b[uU]\.\s*([0-9])", r"48.\1", line)
-            line = re.sub(r"\b[uU][258zZSs](?=[0-9])", "48.", line)
-            line = re.sub(r"\bG(?=[0-9])", "9", line)
-            line = re.sub(r"(?<=[0-9])G(?=[0-9])", "9", line)
-            line = re.sub(r"\)[|lI]?", "11", line)
-
-            # E.g. line 10: '51.122' or 'El 1122'
-            line = re.sub(r"\b51\.122\b", "51.1122", line)
-            line = re.sub(r"^[Ee5][lIL1i]\s*(?!\.)", "51.", line)
-            line = re.sub(r"%", "88", line)
-
-            # E.g. line 6: '-46-4400' or '-46-4900' -> '-96.9900'
-            line = re.sub(r"-[41]6[.-][419]{2,4}00\b", "-96.9900", line)
-            line = re.sub(r"-[41]6[.-]", "-96.", line)
-            line = re.sub(r"4400\b", "9900", line)
-            line = re.sub(r"4900\b", "9900", line)
-
-            # E.g. line 4: '- 5.1234' -> '-115.1234'
-            line = re.sub(r"-[1I]?[5I]\.1234", "-115.1234", line)
-            line = re.sub(r"-\s*5\.1234", "-115.1234", line)
-
-            # E.g. line 3: '- 14.6789' -> '-114.6789'
-            line = re.sub(r"-[1I]?4\.6789", "-114.6789", line)
-            line = re.sub(r"-\s*14\.6789", "-114.6789", line)
-
-            # E.g. line 5: '349.1122' or '49.1122' -> '39.1122'
-            line = re.sub(r"\b[34]?49\.1122", "39.1122", line)
-
-            # E.g. line 7: 'ALY Y433' -> '41.4433'
-            line = re.sub(r"\b[A4][Ll1][Yy4]?\s*[Yy4]?433", "41.4433", line)
 
             # E.g. OCR bracket/O digit confusions
             line = re.sub(r"\][Oo0]", "10", line)
