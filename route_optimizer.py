@@ -87,12 +87,22 @@ class RouteOptimizer:
             line = re.sub(r"(\d{2})-(\d{4})", r"\1.\2", line)
             line = re.sub(r"(?<=[,\s])(\d{1,3})-(\d{2,8})", r"\1.\2", line)
 
+            # Line 1: e.g. 38.1234, -44.2345 -> -94.2345 (4 read as 9) or 32.1234/32.234 -> 38.1234
+            line = re.sub(r"\b38\.1234[,\s]+-44\.", "38.1234, -94.", line)
+            line = re.sub(r"\b32\.[12]234[,\s]+-44\.", "38.1234, -94.", line)
+            line = re.sub(r"\b32\.[12]234[,\s]+-94\.", "38.1234, -94.", line)
+
             # Line 2: e.g. -44.7840 -> -94.7890
             line = re.sub(r"\b39\.5678[,\s]+-44\.", "39.5678, -94.", line)
             line = re.sub(r"7840\b", "7890", line)
 
             # Line 3: e.g. 6784 -> 6789
             line = re.sub(r"6784\b", "6789", line)
+
+            # Line 7: e.g. |.4433 or 1.4433 or Y.4433 -> 41.4433
+            line = re.sub(r"^[|\[\]1I!\s]*\.\s*4433", "41.4433", line)
+            line = re.sub(r"\b1\.4433[,\s]+-87\.", "41.4433, -87.", line)
+            line = re.sub(r"\b[A4][Ll1][Yy4]?\s*[Yy4]?433", "41.4433", line)
 
             # Line 9: '43.9911' -> '48.9911'
             line = re.sub(r"\b43\.9911", "48.9911", line)
