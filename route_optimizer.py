@@ -24,12 +24,45 @@ class RouteOptimizer:
 
     def ingest_image(self, image_path: str) -> str:
         """
-        Extracts raw text from an image using multi-pass enhanced Tesseract OCR:
-        1. Adaptive background subtraction (removes shadows, uneven lighting, & ruled lines)
-        2. Scaled contrast-enhanced pass
-        Combines results to capture maximum legible handwriting.
+        Extracts raw text from an image.
+        First tries Gemini Vision API for high-accuracy handwriting recognition.
+        Falls back to local Tesseract OCR if API fails or is unavailable.
         """
+        import os
+        import base64
+        
+        # Attempt Gemini Vision API First
         try:
+            from google import genai
+            # Initialize client. Assumes GEMINI_API_KEY is set in environment
+            client = genai.Client()
+            
+            with open(image_path, "rb") as f:
+                image_bytes = f.read()
+            image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+            
+            mime_type = "image/jpeg"
+            ext = image_path.lower().split('.')[-1]
+            if ext in ['png', 'webp', 'bmp', 'tiff']:
+                mime_type = f"image/{ext}"
+
+            prompt = "Extract all handwritten coordinates from this image. Output only the numbers, exactly as written, preserving newlines. Do not add any conversational text or markdown formatting."
+            
+            interaction = client.interactions.create(
+                model="gemini-3.8-flash",
+                input=[
+                    {"type": "text", "text": prompt},
+                    {"type": "image", "data": image_b64, "mime_type": mime_type}
+                ]
+            )
+            if interaction.output_text:
+                return interaction.output_text.strip()
+        except Exception as e:
+            print(f"Gemini API failed or not available, falling back to local OCR: {e}")
+            
+        # Fallback to local Tesseract
+        try:
+            from PIL import Image, ImageOps, ImageEnhance, ImageFilter, ImageChops
             img = Image.open(image_path)
             w, h = img.size
             if max(w, h) < 1800:
@@ -39,7 +72,6 @@ class RouteOptimizer:
             gray = ImageOps.grayscale(img)
             
             # Pass 1: Adaptive background subtraction for shadow and lighting gradient removal
-            from PIL import ImageFilter, ImageChops
             bg = gray.filter(ImageFilter.BoxBlur(35))
             diff = ImageChops.subtract(bg, gray)
             clean_bin = diff.point(lambda p: 0 if p > 28 else 255, 'L')
