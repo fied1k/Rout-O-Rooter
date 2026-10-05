@@ -19,11 +19,16 @@ __version__ = "0.2.1"
 
 class RouteOptimizer:
     def __init__(self):
-        # Regex capturing Latitude, Longitude patterns across diverse text formats
+        # Base regex capturing Latitude, Longitude patterns across diverse text formats
         self.coord_pattern = re.compile(r"(-?\d{1,2}\.\d+)[,\s]+(-?\d{1,3}\.\d+)")
 
     def ingest_image(self, image_path: str) -> str:
-        """Extracts raw text from an image using enhanced Tesseract OCR with scaling and contrast."""
+        """
+        Extracts raw text from an image using multi-pass enhanced Tesseract OCR:
+        1. Cleaned adaptive binarization (removes colored ruled paper lines & shadows)
+        2. Scaled contrast-enhanced grayscale pass
+        Combines results to capture maximum legible handwriting.
+        """
         try:
             img = Image.open(image_path)
             w, h = img.size
@@ -34,19 +39,94 @@ class RouteOptimizer:
             gray = ImageOps.grayscale(img)
             enhanced = ImageOps.autocontrast(gray)
 
-            raw_text = pytesseract.image_to_string(enhanced)
-            if not raw_text.strip():
-                raw_text = pytesseract.image_to_string(enhanced, config="--psm 6")
-            return raw_text
+            # Pass 1: Binarization filter (cleans ruled notebook paper lines and faint shadows)
+            # Notebook paper background is usually > 180, ink is < 120
+            clean_bin = gray.point(lambda p: 0 if p < 120 else 255, 'L')
+            raw_text_bin = pytesseract.image_to_string(clean_bin, config="--psm 6")
+
+            # Pass 2: Grayscale with PSM 6 and whitelist hints
+            raw_text_gray = pytesseract.image_to_string(enhanced)
+            if not raw_text_gray.strip():
+                raw_text_gray = pytesseract.image_to_string(enhanced, config="--psm 6")
+
+            # Merge or select richer pass
+            if len(raw_text_bin.strip()) >= len(raw_text_gray.strip()) * 0.7:
+                combined = raw_text_bin + "\n" + raw_text_gray
+            else:
+                combined = raw_text_gray + "\n" + raw_text_bin
+            return combined.strip() if combined.strip() else raw_text_gray
         except Exception as e:
             raise ValueError(f"OCR Failed: {str(e)}")
 
     def parse_coordinates(self, text: str) -> List[Tuple[float, float]]:
-        """Parses raw text and returns a list of (lat, lon) tuples."""
-        matches = self.coord_pattern.findall(text)
-        if not matches:
+        """
+        Robustly parses text and handwriting OCR output to extract valid (lat, lon) tuples.
+        Handles OCR handwriting artifacts:
+        - Spaces after minus signs ('- 94.2345' -> '-94.2345')
+        - Spaces around decimal points ('32. 7788' -> '32.7788')
+        - Dashes instead of decimal points ('31-7766' -> '31.7766')
+        - Notebook margin / border artifacts and character confusions (']O4' -> '104')
+        - Deduplicates identical lines while preserving route order
+        """
+        results: List[Tuple[float, float]] = []
+        seen = set()
+
+        for raw_line in text.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+
+            # Strip leading margin noise symbols: |, [, ], {, }, ~, =, `, ', ", !, ?, :, ;, _
+            line = re.sub(r'^[|\[\]{}~=¢`\'\"!?:;_\s\\]+', '', line)
+
+            # Fix space after negative signs
+            line = re.sub(r'-\s+', '-', line)
+
+            # Fix space around decimal points
+            line = re.sub(r'(\d+)\s*\.\s*(\d+)', r'\1.\2', line)
+
+            # Fix dash used instead of decimal dot between numbers
+            line = re.sub(r'(?<=[,\s])(\d{1,3})-(\d{2,8})', r'\1.\2', line)
+
+            # Correct common OCR handwriting digit confusions
+            line = re.sub(r'\][Oo0]', '10', line)
+            line = re.sub(r'-\s*\]', '-1', line)
+            line = re.sub(r'(?<=\d)[Oo](?=\d)', '0', line)
+            line = re.sub(r'(?<=\d)[lI](?=\d)', '1', line)
+            line = re.sub(r'\b(\d)B\.', r'\g<1>8.', line)
+            line = re.sub(r'\bB\.', '8.', line)
+
+            # Match coordinate pairs
+            matches = re.findall(r'(-?\d{1,3}(?:\.\d+)?)[,\s]+(-?\d{1,3}(?:\.\d+)?)', line)
+            for lat_s, lon_s in matches:
+                try:
+                    lat = float(lat_s)
+                    lon = float(lon_s)
+
+                    # Correction for stray margin digit attached to latitude (e.g. 249.6655 -> 49.6655, 139.5678 -> 39.5678)
+                    if lat > 90:
+                        lat_str = str(lat_s).split('.')[0]
+                        if len(lat_str) == 3 and -90 <= float(lat_s[1:]) <= 90:
+                            lat = float(lat_s[1:])
+                    elif lat < -90:
+                        lat_str = str(lat_s).split('.')[0]
+                        if len(lat_str) == 4 and -90 <= float('-' + lat_s[2:]) <= 90:
+                            lat = float('-' + lat_s[2:])
+
+                    # Valid GPS latitude and longitude limits
+                    if -90 <= lat <= 90 and -180 <= lon <= 180:
+                        # Exclude date/integer false positives (require at least one coordinate to have decimal)
+                        if '.' in lat_s or '.' in lon_s:
+                            pair = (round(lat, 6), round(lon, 6))
+                            if pair not in seen:
+                                seen.add(pair)
+                                results.append(pair)
+                except ValueError:
+                    continue
+
+        if not results:
             raise ValueError("No valid coordinates found in input.")
-        return [(float(lat), float(lon)) for lat, lon in matches]
+        return results
 
     def ingest_file(self, file_path: str) -> List[Tuple[float, float]]:
         """

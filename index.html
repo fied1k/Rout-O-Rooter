@@ -1180,8 +1180,70 @@ Drop 4: 38.9282, -94.7214"></textarea>
       }
     }
 
-    // Coordinate parsing regex matching core python engine
-    const COORD_REGEX = /(-?\d{1,2}\.\d+)[,\s]+(-?\d{1,3}\.\d+)/g;
+    // Coordinate parsing with handwriting OCR noise tolerance
+    const COORD_REGEX = /(-?\d{1,3}(?:\.\d+)?)[,\s]+(-?\d{1,3}(?:\.\d+)?)/g;
+
+    function parseCoordinateText(rawText) {
+      const results = [];
+      const seen = new Set();
+      const lines = rawText.split('\n');
+
+      for (let rawLine of lines) {
+        let line = rawLine.trim();
+        if (!line) continue;
+
+        // Clean margin artifacts & symbols
+        line = line.replace(/^[|[\]{}~=¢`'"!?:;_\s\\]+/, '');
+        // Fix space after minus sign
+        line = line.replace(/-\s+/g, '-');
+        // Fix spaces around decimal point
+        line = line.replace(/(\d+)\s*\.\s*(\d+)/g, '$1.$2');
+        // Fix dash used instead of decimal dot
+        line = line.replace(/(?<=[,\s])(\d{1,3})-(\d{2,8})/g, '$1.$2');
+        // Fix OCR digit confusions
+        line = line.replace(/\][Oo0]/g, '10');
+        line = line.replace(/-\s*\]/g, '-1');
+        line = line.replace(/(?<=\d)[Oo](?=\d)/g, '0');
+        line = line.replace(/(?<=\d)[lI](?=\d)/g, '1');
+        line = line.replace(/\b(\d)B\./g, '$18.');
+        line = line.replace(/\bB\./g, '8.');
+
+        const matches = [...line.matchAll(COORD_REGEX)];
+        for (const m of matches) {
+          let latS = m[1];
+          let lonS = m[2];
+          let lat = parseFloat(latS);
+          let lon = parseFloat(lonS);
+
+          // Handle stray margin digit attached to latitude
+          if (lat > 90) {
+            const intPart = latS.split('.')[0];
+            if (intPart.length === 3) {
+              const stripped = parseFloat(latS.substring(1));
+              if (stripped >= -90 && stripped <= 90) lat = stripped;
+            }
+          } else if (lat < -90) {
+            const intPart = latS.split('.')[0];
+            if (intPart.length === 4) {
+              const stripped = parseFloat('-' + latS.substring(2));
+              if (stripped >= -90 && stripped <= 90) lat = stripped;
+            }
+          }
+
+          if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+            // Require at least one decimal point to avoid date numbers
+            if (latS.includes('.') || lonS.includes('.')) {
+              const key = `${lat.toFixed(5)},${lon.toFixed(5)}`;
+              if (!seen.has(key)) {
+                seen.add(key);
+                results.push([lat, lon]);
+              }
+            }
+          }
+        }
+      }
+      return results;
+    }
 
     function parseTextPayload() {
       const text = document.getElementById('raw-input').value;
@@ -1189,12 +1251,12 @@ Drop 4: 38.9282, -94.7214"></textarea>
         showToast("Please paste coordinate text first");
         return;
       }
-      const matches = [...text.matchAll(COORD_REGEX)];
-      if (!matches.length) {
+      const coords = parseCoordinateText(text);
+      if (!coords.length) {
         showToast("No valid coordinates found in text");
         return;
       }
-      currentCoords = matches.map(m => [parseFloat(m[1]), parseFloat(m[2])]);
+      currentCoords = coords;
       renderStopsList();
       updateMapMarkers();
       showToast(`Parsed ${currentCoords.length} coordinates successfully`);
@@ -1524,9 +1586,8 @@ Drop 4: 38.9282, -94.7214"></textarea>
           }
         }
       ).then(({ data: { text } }) => {
-        const matches = [...text.matchAll(COORD_REGEX)];
-        if (matches.length) {
-          const coords = matches.map(m => [parseFloat(m[1]), parseFloat(m[2])]);
+        const coords = parseCoordinateText(text);
+        if (coords.length) {
           handleOcrSuccess(coords, text);
         } else if (text && text.trim()) {
           handleOcrRawTextOnly(text);
