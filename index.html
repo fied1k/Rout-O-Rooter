@@ -1606,68 +1606,6 @@ Drop 4: 38.9282, -94.7214"></textarea>
       runClientTesseract(blob);
     }
 
-    // Client-side adaptive canvas preprocessor for notebook shadow & line removal
-    function preprocessImageForOcr(blob, callback) {
-      const img = new Image();
-      img.onload = () => {
-        let w = img.naturalWidth || img.width;
-        let h = img.naturalHeight || img.height;
-        const scale = Math.max(1.0, Math.min(2.0, 1600 / Math.max(w, h)));
-        w = Math.round(w * scale);
-        h = Math.round(h * scale);
-
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
-
-        const imgData = ctx.getImageData(0, 0, w, h);
-        const data = imgData.data;
-
-        // Convert to grayscale and calculate simple running local threshold
-        const gray = new Uint8ClampedArray(w * h);
-        for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-          // Luma
-          gray[j] = Math.round(data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
-        }
-
-        // Adaptive window comparison (estimate background)
-        const windowSize = Math.max(15, Math.round(w / 30));
-        for (let y = 0; y < h; y++) {
-          for (let x = 0; x < w; x++) {
-            const idx = y * w + x;
-            const px = gray[idx];
-
-            // Sample local neighbors horizontally
-            let sum = 0, count = 0;
-            const startX = Math.max(0, x - windowSize);
-            const endX = Math.min(w - 1, x + windowSize);
-            for (let k = startX; k <= endX; k += 4) {
-              sum += gray[y * w + k];
-              count++;
-            }
-            const localMean = sum / count;
-
-            // If significantly darker than local background (ink), make black; else white
-            const val = (localMean - px > 18) ? 0 : 255;
-            const pIdx = idx * 4;
-            data[pIdx] = val;
-            data[pIdx + 1] = val;
-            data[pIdx + 2] = val;
-            data[pIdx + 3] = 255;
-          }
-        }
-
-        ctx.putImageData(imgData, 0, 0);
-        canvas.toBlob((processedBlob) => {
-          callback(processedBlob || blob);
-        }, 'image/png');
-      };
-      img.onerror = () => callback(blob);
-      img.src = URL.createObjectURL(blob);
-    }
-
     function runClientTesseract(blob) {
       const statusBadge = document.getElementById('ocr-status-badge');
       const details = document.getElementById('ocr-details');
@@ -1681,33 +1619,29 @@ Drop 4: 38.9282, -94.7214"></textarea>
         statusBadge.textContent = '🤖 Client-Side OCR Running...';
         statusBadge.style.color = 'var(--warning)';
       }
-      if (details) details.textContent = 'Preprocessing image to remove shadows and lined paper...';
+      if (details) details.textContent = 'Initializing WebAssembly Tesseract OCR...';
 
-      preprocessImageForOcr(blob, (readyBlob) => {
-        if (details) details.textContent = 'Initializing WebAssembly Tesseract OCR...';
-
-        Tesseract.recognize(
-          readyBlob,
-          'eng',
-          {
-            logger: m => {
-              if (m.status === 'recognizing text' && details) {
-                details.textContent = `Scanning: ${Math.round(m.progress * 100)}%`;
-              }
+      Tesseract.recognize(
+        blob,
+        'eng',
+        {
+          logger: m => {
+            if (m.status === 'recognizing text' && details) {
+              details.textContent = `Scanning: ${Math.round(m.progress * 100)}%`;
             }
           }
-        ).then(({ data: { text } }) => {
-          const coords = parseCoordinateText(text);
-          if (coords.length) {
-            handleOcrSuccess(coords, text);
-          } else if (text && text.trim()) {
-            handleOcrRawTextOnly(text);
-          } else {
-            handleOcrFailure("No coordinates detected in image via OCR");
-          }
-        }).catch(err => {
-          handleOcrFailure("OCR error: " + err.message);
-        });
+        }
+      ).then(({ data: { text } }) => {
+        const coords = parseCoordinateText(text);
+        if (coords.length) {
+          handleOcrSuccess(coords, text);
+        } else if (text && text.trim()) {
+          handleOcrRawTextOnly(text);
+        } else {
+          handleOcrFailure("No coordinates detected in image via OCR");
+        }
+      }).catch(err => {
+        handleOcrFailure("OCR error: " + err.message);
       });
     }
 
