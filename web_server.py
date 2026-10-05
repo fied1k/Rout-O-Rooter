@@ -170,8 +170,26 @@ class RoutORooterHandler(SimpleHTTPRequestHandler):
                     tmp_path = tmp.name
 
                 try:
-                    coords = optimizer.ingest_file(tmp_path)
-                    self._send_json(200, {"success": True, "filename": filename, "coords": coords})
+                    raw_text = ""
+                    if ext.lower() in [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff"]:
+                        raw_text = optimizer.ingest_image(tmp_path)
+                        try:
+                            coords = optimizer.parse_coordinates(raw_text)
+                        except Exception:
+                            coords = []
+                    else:
+                        coords = optimizer.ingest_file(tmp_path)
+
+                    if not coords and not raw_text.strip():
+                        raise ValueError("No valid coordinates found in input.")
+
+                    self._send_json(200, {
+                        "success": True if coords else False,
+                        "filename": filename,
+                        "coords": coords,
+                        "raw_text": raw_text,
+                        "error": "No coordinates detected in image via OCR." if not coords else None
+                    })
                 finally:
                     if os.path.exists(tmp_path):
                         os.remove(tmp_path)

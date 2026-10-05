@@ -12,7 +12,7 @@ import unittest
 import requests
 import qrcode
 import pytesseract
-from PIL import Image
+from PIL import Image, ImageOps, ImageEnhance
 
 __version__ = "0.2.1"
 
@@ -23,9 +23,21 @@ class RouteOptimizer:
         self.coord_pattern = re.compile(r"(-?\d{1,2}\.\d+)[,\s]+(-?\d{1,3}\.\d+)")
 
     def ingest_image(self, image_path: str) -> str:
-        """Extracts raw text from an image using Tesseract OCR."""
+        """Extracts raw text from an image using enhanced Tesseract OCR with scaling and contrast."""
         try:
-            return pytesseract.image_to_string(Image.open(image_path))
+            img = Image.open(image_path)
+            w, h = img.size
+            if max(w, h) < 1600:
+                scale_factor = 2 if max(w, h) < 900 else 1.5
+                img = img.resize((int(w * scale_factor), int(h * scale_factor)), Image.Resampling.LANCZOS)
+
+            gray = ImageOps.grayscale(img)
+            enhanced = ImageOps.autocontrast(gray)
+
+            raw_text = pytesseract.image_to_string(enhanced)
+            if not raw_text.strip():
+                raw_text = pytesseract.image_to_string(enhanced, config="--psm 6")
+            return raw_text
         except Exception as e:
             raise ValueError(f"OCR Failed: {str(e)}")
 

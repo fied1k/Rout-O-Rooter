@@ -11,6 +11,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <!-- QRCode.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Tesseract.js for Browser OCR fallback -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <style>
     :root {
@@ -811,9 +813,51 @@
 
       <!-- Ingestion Method Tabs -->
       <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('text')">Text / Paste</button>
-        <button class="tab-btn" onclick="switchTab('file')">Upload File</button>
-        <button class="tab-btn" onclick="switchTab('manual')">Manual</button>
+        <button class="tab-btn active" id="tab-btn-text" onclick="switchTab('text')">Text / Paste</button>
+        <button class="tab-btn" id="tab-btn-camera" onclick="switchTab('camera')">📸 Camera / Photo</button>
+        <button class="tab-btn" id="tab-btn-file" onclick="switchTab('file')">Upload File</button>
+        <button class="tab-btn" id="tab-btn-manual" onclick="switchTab('manual')">Manual</button>
+      </div>
+
+      <!-- Tab 0: Camera & Photo OCR -->
+      <div id="tab-camera" class="tab-content">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
+          <!-- Mobile Native Camera Shutter (Direct camera launch on iOS & Android) -->
+          <input type="file" id="camera-direct-input" accept="image/*" capture="environment" style="display: none;" onchange="handleImageFile(event)" />
+          <button class="btn-action" style="flex: 1; padding: 10px 14px; font-size: 0.85rem;" onclick="document.getElementById('camera-direct-input').click()">
+            📸 Take Picture
+          </button>
+          
+          <!-- Live Viewfinder for Webcam / Desktop / Tablet -->
+          <button class="btn-preset" style="padding: 10px 14px; font-size: 0.82rem;" onclick="openCameraModal()" title="Open live webcam/camera viewfinder">
+            🖥️ Live Viewfinder
+          </button>
+          
+          <!-- Photo File Picker -->
+          <input type="file" id="photo-upload-input" accept="image/*" style="display: none;" onchange="handleImageFile(event)" />
+          <button class="btn-preset" style="padding: 10px 14px; font-size: 0.82rem;" onclick="document.getElementById('photo-upload-input').click()">
+            🖼️ Upload Photo
+          </button>
+        </div>
+
+        <!-- Photo Drop & Paste Zone -->
+        <div class="dropzone" id="photo-dropzone" onclick="document.getElementById('photo-upload-input').click()" style="padding: 18px; border-style: dashed;">
+          <div style="font-size: 26px;">📝📷</div>
+          <strong style="font-size: 0.84rem;">Snap photo or press Ctrl+V to paste image</strong>
+          <p style="font-size: 0.73rem; color: var(--text-muted); margin-top: 4px;">Supports handwritten notes, dispatch sheets, screenshots, or receipts</p>
+        </div>
+
+        <!-- Captured Image Preview & OCR Status Area -->
+        <div id="ocr-preview-container" style="display: none; margin-top: 10px; background: #121d30; border: 1px solid var(--border-dark); border-radius: 8px; padding: 10px;">
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <img id="ocr-preview-img" src="" alt="Captured Photo" style="width: 72px; height: 72px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-dark); background: #000;" />
+            <div style="flex: 1; min-width: 0;">
+              <div id="ocr-status-badge" style="font-weight: 600; font-size: 0.82rem; color: var(--primary); margin-bottom: 3px;">🔍 OCR Scanning...</div>
+              <div id="ocr-details" style="color: var(--text-muted); font-size: 0.74rem;">Extracting coordinates from written text...</div>
+            </div>
+          </div>
+          <textarea id="ocr-raw-output" style="width: 100%; height: 55px; margin-top: 8px; font-size: 0.72rem; display: none; background: #0b0f19; border: 1px solid var(--border-dark); border-radius: 4px; color: var(--text-muted); padding: 6px; font-family: monospace;" readonly placeholder="Detected text..."></textarea>
+        </div>
       </div>
 
       <!-- Tab 1: Raw Text -->
@@ -1013,6 +1057,32 @@ Drop 4: 38.9282, -94.7214"></textarea>
     </div>
   </div>
 
+  <!-- Live Camera Viewfinder Modal -->
+  <div id="camera-modal" class="modal-overlay" onclick="closeCameraModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 520px;">
+      <div class="modal-header">
+        <div style="font-weight: 600; font-size: 1rem; color: var(--text-main);">
+          📸 Camera Viewfinder
+        </div>
+        <button class="modal-close" onclick="closeCameraModal()">&times;</button>
+      </div>
+      <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">
+        Align the written coordinates inside the targeting frame and click Capture & Scan.
+      </div>
+      <div style="position: relative; border-radius: 8px; overflow: hidden; background: #000; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center;">
+        <video id="camera-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+        <div style="position: absolute; inset: 20px; border: 2px dashed rgba(56, 189, 248, 0.6); border-radius: 8px; pointer-events: none; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px;">
+          <span style="font-size: 0.72rem; color: rgba(255,255,255,0.85); background: rgba(0,0,0,0.55); padding: 2px 8px; border-radius: 4px;">Center written coordinates here</span>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 14px; justify-content: center; flex-wrap: wrap;">
+        <button class="btn-action" style="padding: 10px 22px;" onclick="capturePhotoFromVideo()">📸 Capture & Scan</button>
+        <button class="btn-preset" style="padding: 10px 14px;" onclick="flipCamera()">🔄 Flip Camera</button>
+        <button class="btn-preset" style="padding: 10px 14px;" onclick="closeCameraModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Status Toast -->
   <div id="toast">Message here</div>
 
@@ -1043,6 +1113,8 @@ Drop 4: 38.9282, -94.7214"></textarea>
       initMap();
       initQR();
       setupDropzone();
+      setupPhotoDropzone();
+      setupClipboardPaste();
       checkBackend();
       renderStopsList();
     });
@@ -1094,14 +1166,17 @@ Drop 4: 38.9282, -94.7214"></textarea>
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
       if (tabName === 'text') {
-        document.querySelectorAll('.tab-btn')[0].classList.add('active');
-        document.getElementById('tab-text').classList.add('active');
+        document.getElementById('tab-btn-text')?.classList.add('active');
+        document.getElementById('tab-text')?.classList.add('active');
+      } else if (tabName === 'camera') {
+        document.getElementById('tab-btn-camera')?.classList.add('active');
+        document.getElementById('tab-camera')?.classList.add('active');
       } else if (tabName === 'file') {
-        document.querySelectorAll('.tab-btn')[1].classList.add('active');
-        document.getElementById('tab-file').classList.add('active');
+        document.getElementById('tab-btn-file')?.classList.add('active');
+        document.getElementById('tab-file')?.classList.add('active');
       } else {
-        document.querySelectorAll('.tab-btn')[2].classList.add('active');
-        document.getElementById('tab-manual').classList.add('active');
+        document.getElementById('tab-btn-manual')?.classList.add('active');
+        document.getElementById('tab-manual')?.classList.add('active');
       }
     }
 
@@ -1173,38 +1248,7 @@ Drop 4: 38.9282, -94.7214"></textarea>
 
       // Check if image format
       if (['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tiff'].includes(ext)) {
-        if (!backendOnline) {
-          showToast("Image OCR requires running web_server.py (Python backend)");
-          return;
-        }
-
-        showToast(`Uploading ${file.name} for OCR processing...`);
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          fetch('/api/upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              filename: file.name,
-              base64: e.target.result
-            })
-          })
-          .then(res => res.json())
-          .then(data => {
-            if (data.success && data.coords && data.coords.length) {
-              currentCoords = data.coords;
-              renderStopsList();
-              updateMapMarkers();
-              showToast(`OCR successfully extracted ${data.coords.length} coordinates!`);
-            } else {
-              showToast(data.error || "No coordinates detected in image via OCR.");
-            }
-          })
-          .catch(err => {
-            showToast("OCR request failed: " + err.message);
-          });
-        };
-        reader.readAsDataURL(file);
+        processImageBlob(file, file.name);
         return;
       }
 
@@ -1255,6 +1299,295 @@ Drop 4: 38.9282, -94.7214"></textarea>
         };
         reader.readAsText(file);
       }
+    }
+
+    // Camera & Photo Dropzone Setup
+    function setupPhotoDropzone() {
+      const photoZone = document.getElementById('photo-dropzone');
+      if (!photoZone) return;
+      ['dragenter', 'dragover'].forEach(event => {
+        photoZone.addEventListener(event, (e) => {
+          e.preventDefault();
+          photoZone.classList.add('dragover');
+        });
+      });
+      ['dragleave', 'drop'].forEach(event => {
+        photoZone.addEventListener(event, (e) => {
+          e.preventDefault();
+          photoZone.classList.remove('dragover');
+        });
+      });
+      photoZone.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length) {
+          processImageBlob(files[0], files[0].name || 'dropped-image.png');
+        }
+      });
+    }
+
+    // Global Clipboard Paste for Screenshots/Photos
+    function setupClipboardPaste() {
+      window.addEventListener('paste', (e) => {
+        const items = (e.clipboardData || window.clipboardData).items;
+        if (!items) return;
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf('image') !== -1) {
+            const blob = items[i].getAsFile();
+            if (blob) {
+              switchTab('camera');
+              processImageBlob(blob, 'pasted-screenshot.png');
+              break;
+            }
+          }
+        }
+      });
+    }
+
+    function handleImageFile(e) {
+      if (e.target.files && e.target.files.length) {
+        processImageBlob(e.target.files[0], e.target.files[0].name || 'photo.jpg');
+        e.target.value = '';
+      }
+    }
+
+    // Live Camera Stream State
+    let cameraStream = null;
+    let currentFacingMode = 'environment'; // 'environment' (back) or 'user' (selfie/webcam)
+
+    async function openCameraModal() {
+      const modal = document.getElementById('camera-modal');
+      if (!modal) return;
+      modal.classList.add('active');
+      await startCameraStream();
+    }
+
+    function closeCameraModal(e) {
+      if (e && e.target && e.target.id !== 'camera-modal' && !e.target.classList.contains('modal-close')) return;
+      stopCameraStream();
+      const modal = document.getElementById('camera-modal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    async function startCameraStream() {
+      stopCameraStream();
+      const video = document.getElementById('camera-video');
+      if (!video) return;
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showToast("Camera access not supported on this device/browser");
+        return;
+      }
+
+      try {
+        const constraints = {
+          video: {
+            facingMode: { ideal: currentFacingMode },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          },
+          audio: false
+        };
+        cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = cameraStream;
+        await video.play();
+      } catch (err) {
+        // Fallback if ideal facing mode fails (e.g. desktop webcam)
+        try {
+          cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          video.srcObject = cameraStream;
+          await video.play();
+        } catch (fallbackErr) {
+          showToast("Unable to access camera: " + fallbackErr.message);
+        }
+      }
+    }
+
+    function stopCameraStream() {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+      }
+      const video = document.getElementById('camera-video');
+      if (video) video.srcObject = null;
+    }
+
+    async function flipCamera() {
+      currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+      await startCameraStream();
+    }
+
+    function capturePhotoFromVideo() {
+      const video = document.getElementById('camera-video');
+      if (!video || !video.videoWidth) {
+        showToast("Camera stream not ready yet");
+        return;
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      canvas.toBlob((blob) => {
+        closeCameraModal();
+        switchTab('camera');
+        processImageBlob(blob, 'camera-capture.jpg');
+      }, 'image/jpeg', 0.95);
+    }
+
+    // Core Image OCR Processing (Dual Engine: Python backend Tesseract + Client Tesseract.js fallback)
+    function processImageBlob(blob, filename) {
+      if (!blob) return;
+
+      // Show Preview
+      const previewContainer = document.getElementById('ocr-preview-container');
+      const previewImg = document.getElementById('ocr-preview-img');
+      const statusBadge = document.getElementById('ocr-status-badge');
+      const details = document.getElementById('ocr-details');
+      const rawOutput = document.getElementById('ocr-raw-output');
+
+      if (previewContainer) previewContainer.style.display = 'block';
+      if (rawOutput) {
+        rawOutput.style.display = 'none';
+        rawOutput.value = '';
+      }
+
+      const objectUrl = URL.createObjectURL(blob);
+      if (previewImg) previewImg.src = objectUrl;
+
+      if (statusBadge) {
+        statusBadge.textContent = '🔍 Reading Image...';
+        statusBadge.style.color = 'var(--primary)';
+      }
+      if (details) details.textContent = 'Uploading to OCR engine...';
+
+      // 1. If Python backend is connected, use backend /api/upload
+      if (backendOnline) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (statusBadge) statusBadge.textContent = '⚡ Running Tesseract OCR Engine...';
+          fetch('/api/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filename: filename || 'photo.jpg',
+              base64: e.target.result
+            })
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.coords && data.coords.length) {
+              handleOcrSuccess(data.coords, data.raw_text);
+            } else if (data.raw_text && data.raw_text.trim()) {
+              handleOcrRawTextOnly(data.raw_text);
+            } else {
+              handleOcrFailure(data.error || "No coordinates found in photo");
+            }
+          })
+          .catch(err => {
+            // If backend fails, fallback to client-side Tesseract.js
+            runClientTesseract(blob);
+          });
+        };
+        reader.readAsDataURL(blob);
+        return;
+      }
+
+      // 2. Browser Standalone Mode fallback with Tesseract.js
+      runClientTesseract(blob);
+    }
+
+    function runClientTesseract(blob) {
+      const statusBadge = document.getElementById('ocr-status-badge');
+      const details = document.getElementById('ocr-details');
+
+      if (typeof Tesseract === 'undefined') {
+        handleOcrFailure("Python backend offline and Tesseract.js could not be loaded");
+        return;
+      }
+
+      if (statusBadge) {
+        statusBadge.textContent = '🤖 Client-Side OCR Running...';
+        statusBadge.style.color = 'var(--warning)';
+      }
+      if (details) details.textContent = 'Initializing WebAssembly Tesseract OCR...';
+
+      Tesseract.recognize(
+        blob,
+        'eng',
+        {
+          logger: m => {
+            if (m.status === 'recognizing text' && details) {
+              details.textContent = `Scanning: ${Math.round(m.progress * 100)}%`;
+            }
+          }
+        }
+      ).then(({ data: { text } }) => {
+        const matches = [...text.matchAll(COORD_REGEX)];
+        if (matches.length) {
+          const coords = matches.map(m => [parseFloat(m[1]), parseFloat(m[2])]);
+          handleOcrSuccess(coords, text);
+        } else if (text && text.trim()) {
+          handleOcrRawTextOnly(text);
+        } else {
+          handleOcrFailure("No coordinates detected in image via OCR");
+        }
+      }).catch(err => {
+        handleOcrFailure("OCR error: " + err.message);
+      });
+    }
+
+    function handleOcrSuccess(coords, rawText) {
+      const statusBadge = document.getElementById('ocr-status-badge');
+      const details = document.getElementById('ocr-details');
+      const rawOutput = document.getElementById('ocr-raw-output');
+
+      if (statusBadge) {
+        statusBadge.textContent = `✅ Found ${coords.length} Coordinates!`;
+        statusBadge.style.color = 'var(--accent)';
+      }
+      if (details) details.textContent = `Extracted ${coords.length} stop locations directly into route builder.`;
+      if (rawOutput && rawText) {
+        rawOutput.value = rawText.trim();
+        rawOutput.style.display = 'block';
+      }
+
+      currentCoords = coords;
+      renderStopsList();
+      updateMapMarkers();
+      showToast(`OCR captured ${coords.length} coordinates!`);
+    }
+
+    function handleOcrRawTextOnly(rawText) {
+      const statusBadge = document.getElementById('ocr-status-badge');
+      const details = document.getElementById('ocr-details');
+      const rawOutput = document.getElementById('ocr-raw-output');
+
+      if (statusBadge) {
+        statusBadge.textContent = '⚠️ Text Found, Coordinates Uncertain';
+        statusBadge.style.color = 'var(--warning)';
+      }
+      if (details) details.textContent = 'Text was extracted. Check the box below or edit manually in Text tab.';
+      if (rawOutput) {
+        rawOutput.value = rawText.trim();
+        rawOutput.style.display = 'block';
+      }
+      const rawInput = document.getElementById('raw-input');
+      if (rawInput) rawInput.value = rawText.trim();
+      showToast("Text read from photo, but latitude/longitude pattern was unclear.");
+    }
+
+    function handleOcrFailure(message) {
+      const statusBadge = document.getElementById('ocr-status-badge');
+      const details = document.getElementById('ocr-details');
+
+      if (statusBadge) {
+        statusBadge.textContent = '❌ No Coordinates Found';
+        statusBadge.style.color = 'var(--danger)';
+      }
+      if (details) details.textContent = message || "Please ensure writing has clear decimal coordinates (e.g. 39.0997, -94.5786).";
+      showToast(message || "No coordinates detected via OCR");
     }
 
     let draggedIndex = null;
