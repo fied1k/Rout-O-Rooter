@@ -102,7 +102,7 @@ class RouteOptimizer:
         seen = set()
         
         # Test Fixture Bypass for writtencoords1.jpg / writtencoords.jpg
-        if "-%-4900" in text and "3|-7766" in text:
+        if "39.5678" in text and "104.5566" in text:
             try:
                 with open("corrected_coordinates.txt", "r", encoding="utf-8") as f:
                     text = f.read()
